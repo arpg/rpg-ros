@@ -7,6 +7,9 @@
 #include <thread>
 
 #include <HAL/Camera/CameraDevice.h>
+#include <HAL/Utils/StringUtils.h>
+#include <calibu/cam/CameraRig.h>
+#include <calibu/cam/CameraXml.h>
 #include <PbMsgs/ImageArray.h>
 
 #include <ros/ros.h>
@@ -17,6 +20,8 @@
 #define nodeName "roscam" //ROS node name
 #define defaultURI "opencv://" //Default URI for camera data
 #define defaultFPS 10 //Frames per second
+#define defaultCameraModel "" //Path to camera model XML file
+
 
 std::string findFormat(uint32_t format)
 {
@@ -64,6 +69,7 @@ int main(int argc, char *argv[])
 
   std::string hal_uri;
   double fps;
+  std::string camera_model;
 
   ros::init(argc, argv, nodeName);
   ros::NodeHandle nh("~");
@@ -73,9 +79,32 @@ int main(int argc, char *argv[])
   // get params
   hal_uri = defaultURI;
   fps = defaultFPS;
+  camera_model = defaultCameraModel;
 
   nh.getParam("URI",hal_uri);
   nh.getParam("fps",fps);
+  nh.getParam("camera_model",camera_model);
+
+  //Try to find the camera model
+  std::string modelFileName = hal::ExpandTildePath(camera_model);
+  if (!hal::FileExists(modelFileName))
+    {
+      ROS_FATAL("Could not find camera model file: %s\n", modelFileName.c_str());
+      return -1;
+    }
+
+  ROS_INFO("Opening camera model file: %s\n", modelFileName.c_str());
+  calibu::CameraRig rig = calibu::ReadXmlRig( modelFileName);
+  ROS_INFO("Found %lu camera models\n", rig.cameras.size());
+  
+  const calibu::CameraModel& camModel = rig.cameras[0].camera;
+
+  //Retrieve the K matrix
+  Eigen::Matrix<double,3,3> kMatrix = camModel.K();
+
+  //Save the float64 K matrix out:
+  double *kMatrixRaw = kMatrix.data();
+
 
   // initiate camera
   std::unique_ptr<hal::Camera> cam;
@@ -83,6 +112,7 @@ int main(int argc, char *argv[])
     cam.reset(new hal::Camera(hal::Uri(hal_uri)));
   } catch (...) {
     ROS_FATAL("Could not create camera from URI:%s\n ", hal_uri.c_str());
+    return -1;
   }
 
   ROS_INFO("Opening HAL URI: %s at framerate: %1.1f\n", hal_uri.c_str(), fps);
@@ -127,6 +157,7 @@ int main(int argc, char *argv[])
 	  camera_info.header.frame_id = rosOut.header.frame_id;
 	  camera_info.width = rawImgMsg.width();
 	  camera_info.height = rawImgMsg.height();
+	  memcpy(&camera_info.K,  kMatrixRaw, 9*sizeof(*kMatrixRaw));
 	  camera_info.header.frame_id = rosOut.header.frame_id;
 	  camera_info.header.stamp = rosOut.header.stamp;
 		
