@@ -1,0 +1,17 @@
+<package>
+  <description brief="DrRobotMotionSensorDriver">
+
+     This package will work as driver library to be called by Jagaur robot player
+
+  </description>
+  <author>Dr Robot</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/drrobot_jaguar_ros_pkg</url>
+  <export>
+    <cpp cflags="-I${prefix}/include" lflags="-Wl,-rpath,${prefix}/lib
+    -L${prefix}/lib -lDrRobotMotionSensorDriver"/>
+  </export> 
+</package>
+
+

@@ -1,0 +1,11 @@
+<launch>
+  <group ns="/">
+    <rosparam file="$(find jaguar)/jaguar.yaml" command="load"/>	
+    <node pkg="jaguar" name="jaguar_node" type="jaguar_node" output="screen">
+
+     </node>
+    <node pkg="joy" name="joy_node" type="joy_node"/>	
+    <node pkg="jaguar" name="jaguar_joystick" type="jaguar_joystick" output="screen"/>
+  </group>
+</launch>
+

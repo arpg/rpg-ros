@@ -1,0 +1,4 @@
+jaguar_node: {RobotCommMethod: Network, RobotID: arpg_jag, RobotBaseIP: 192.168.0.60,
+  RobotPortNum: 10001, RobotSerialPort: /dev/ttyS0, RobotType: Jaguar, MotorDir: 1, WheelRadius: 0.135, WheelDistance: 0.45,
+  EncoderCircleCnt: 190, MinSpeed: 0.1, MaxSpeed: 1.0, Enable_IR: false, Enable_US: false}
+joystick_teleop: {scale_flipper: 0.5}
