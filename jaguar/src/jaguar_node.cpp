@@ -105,6 +105,8 @@ Publishes to (name / type):
 #define MOTOR_NUM       6
 #define IR_NUM          10
 #define US_NUM          6
+#define DEFAULT_BAUD    115200
+
 using namespace std;
 using namespace JaguarBase;
 
@@ -235,27 +237,25 @@ public:
         robotConfig2_.portNum = commPortNum_ + 1;
 
 
-	  strcpy(robotConfig1_.robotIP,robotIP_.c_str());
-
-	  strcpy(robotConfig2_.robotIP,robotIP_.c_str());
-
-	  strcpy(robotConfig1_.serialPortName,robotSerialPort_.c_str());
-
-	  strcpy(robotConfig2_.serialPortName,robotSerialPort_.c_str());
-
+	strcpy(robotConfig1_.robotIP,robotIP_.c_str());
+	
+	strcpy(robotConfig2_.robotIP,robotIP_.c_str());
+	
+	strcpy(robotConfig1_.serialPortName,robotSerialPort_.c_str());
+	
+	strcpy(robotConfig2_.serialPortName,robotSerialPort_.c_str());
+	
         //create publishers for sensor data information
-	  motorInfo_pub_ = node_.advertise<jaguar::MotorInfoArray>("motor", 1);
-	  powerInfo_pub_ = node_.advertise<jaguar::PowerInfo>("powerinfo", 1);
-	  if (enable_ir_) { ir_pub_ = node_.advertise<jaguar::RangeArray>("ir", 1); }
+	motorInfo_pub_ = node_.advertise<jaguar::MotorInfoArray>("motor", 1);
+	powerInfo_pub_ = node_.advertise<jaguar::PowerInfo>("powerinfo", 1);
+	if (enable_ir_) { ir_pub_ = node_.advertise<jaguar::RangeArray>("ir", 1); }
         if (enable_sonar_) { sonar_pub_ = node_.advertise<jaguar::RangeArray>("sonar",1); }
         standardSensor_pub_ = node_.advertise<jaguar::StandardSensor>("standardsensor", 1);
         customSensor_pub_ = node_.advertise<jaguar::CustomSensor>("customsensor", 1);
 
 
 	//For dual-board robots
-
         drrobotPowerDriver_ = new MotionSensorDriver();
-
         jaguarMotionDriver_ = new MotionSensorDriver();
 
         if (  (robotType_ == "Jaguar") )
@@ -273,34 +273,67 @@ public:
     ~JaguarNode()
     {
     }
+  
+  int openComm()
+  {
+    int rv = -1;
+    if (  (robotType_ == "Jaguar"))
+      {
+	if (robotCommMethod_ == "Serial")
+	  {
+	    rv = jaguarMotionDriver_->openSerial(robotConfig1_.serialPortName,DEFAULT_BAUD);
+	    if (rv == 0)
+	      {
+		ROS_INFO("open serial port: [%s]", robotConfig1_.serialPortName);
+		return 0;
+	      }
+	    else
+	      {
+		ROS_INFO("could not open serial connection to [%s]",  robotConfig1_.serialPortName);
+		//ROS_INFO("error code [%d]",  res);
+		return -1;
+	      }
+	  }
+	else if (robotCommMethod_ == "Network")
+	  {
+	    rv = jaguarMotionDriver_->openNetwork(robotConfig1_.robotIP,robotConfig1_.portNum);
+	    if (rv == 0)
+	      {
+		ROS_INFO("open port number at: [%d]", robotConfig1_.portNum);
+		return 0;
+	      }
+	    else
+	      {
+		ROS_INFO("could not open network connection to [%s,%d]",  robotConfig1_.robotIP,robotConfig1_.portNum);
+		//ROS_INFO("error code [%d]",  res);
+		return -1;
+	      }
+	  }
+	else
+	  {
+	    ROS_INFO("Unknown connection type: %s\n", robotCommMethod_.c_str());
+	    return -1;
+	  }
+      }
+    else
+      {
+	jaguarMotionDriver_->openNetwork(robotConfig2_.robotIP,robotConfig2_.portNum);
+        drrobotPowerDriver_->openNetwork(robotConfig1_.robotIP,robotConfig1_.portNum);
+      }
+  }
 
     int start()
     {
 
       int res = -1;
-      if (  (robotType_ == "Jaguar"))
-      {
-        res = jaguarMotionDriver_->openNetwork(robotConfig1_.robotIP,robotConfig1_.portNum);
-	if (res == 0)
+      res = openComm();
+      if (res)
 	{
-		ROS_INFO("open port number at: [%d]", robotConfig1_.portNum);
+	  ROS_FATAL("Unable to open communications\n");
+	  return -1;
 	}
-	else
-	{
-		ROS_INFO("could not open network connection to [%s,%d]",  robotConfig1_.robotIP,robotConfig1_.portNum);
-		//ROS_INFO("error code [%d]",  res);
-	}
-
-      }
-      else
-      {
-        jaguarMotionDriver_->openNetwork(robotConfig2_.robotIP,robotConfig2_.portNum);
-        drrobotPowerDriver_->openNetwork(robotConfig1_.robotIP,robotConfig1_.portNum);
-
-      }
-
       cmd_vel_sub_ = node_.subscribe<geometry_msgs::Twist>("cmd_vel", 1, boost::bind(&JaguarNode::cmdVelReceived, this, _1));
-        return(0);
+      return(0);
     }
 
     int stop()
