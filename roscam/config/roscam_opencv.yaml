@@ -1,1 +1,1 @@
-roscam_node: {URI: "opencv://", fps: 30, camera_model: "/run/media/smcguire/9C33-6BBD/camera_imu.xml"}
+roscam_node: {URI: "opencv://", fps: 30, topic: "/roscam", camera_model: "/run/media/smcguire/9C33-6BBD/camera_imu.xml"}

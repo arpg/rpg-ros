@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(roscam)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -std=c++11 -Wall -Wextra")
+#cmake_policy(SET CMP0054 OLD)
 
 
 ## Find catkin macros and libraries
@@ -16,9 +17,9 @@ find_package(catkin REQUIRED COMPONENTS
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 find_package(HAL 0.1 REQUIRED)
-find_package(PbMsgs 2.0 REQUIRED)
 find_package(Calibu 0.1 REQUIRED)
 find_package(eigen 0.0 REQUIRED)
+
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
@@ -99,19 +100,16 @@ catkin_package(
 
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
-# include_directories(include)
+
+include_directories(include)
 include_directories(
-  ${catkin_INCLUDE_DIRS}x
+  ${catkin_INCLUDE_DIRS}
   ${HAL_INCLUDE_DIRS}
-  ${PbMsgs_INCLUDE_DIRS}
   ${Calibu_INCLUDE_DIRS}
   ${eigen_INCLUDE_DIRS}		
 )
 
-if (NOT (HAL_FOUND AND PbMsgs_FOUND AND Calibu_FOUND))
-  message("Skipping ${PROJECT_NAME} because some dependency is not met:")
-  message("${HAL_FOUND} ${PbMsgs_FOUND}")
-endif()
+
 
 ## Declare a cpp library
 # add_library(roscam
@@ -129,7 +127,6 @@ endif()
  target_link_libraries(roscam_node
    ${catkin_LIBRARIES}
    ${HAL_LIBRARIES}
-   ${PbMsgs_LIBRARIES}
    ${Calibu_LIBRARIES}
    ${eigen_LIBRARIES}	
    protobuf

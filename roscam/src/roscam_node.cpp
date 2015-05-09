@@ -1,16 +1,21 @@
-// Sends camera images trhough a Node connection
+// Sends camera images through a ROS connection
 //
 
 #include <iostream>
 #include <memory>
 #include <chrono>
 #include <thread>
+#include <vector>
+#include <string>
 
 #include <HAL/Camera/CameraDevice.h>
 #include <HAL/Utils/StringUtils.h>
-#include <calibu/cam/CameraRig.h>
-#include <calibu/cam/CameraXml.h>
-#include <PbMsgs/ImageArray.h>
+#include <calibu/Calibu.h>
+#include <calibu/cam/camera_rig.h>
+#include <calibu/cam/camera_xml.h>
+
+#include <HAL/Image.pb.h>
+#include <HAL/Messages/ImageArray.h>
 
 #include <ros/ros.h>
 #include <ros/console.h>
@@ -23,43 +28,80 @@
 #define defaultCameraModel "" //Path to camera model XML file
 
 
-std::string findFormat(uint32_t format)
+using namespace std;
+
+struct hal_camera
+{
+  double kMatrix[9];
+  uint32_t height;
+  uint32_t width;
+  image_transport::CameraPublisher pub;
+};
+
+/*Split fcn from http://stackoverflow.com/questions/236129/split-a-string-in-c */
+template<typename T>
+vector<T> split(const T & str, const T & delimiters)
+  {
+    vector<T> v;
+    typename T::size_type start = 0;
+    size_t pos = str.find_first_of(delimiters, start);
+    while(pos != T::npos) {
+      if(pos != start) // ignore empty tokens
+	v.push_back(str.substr(start, pos - start));
+      start = pos + 1;
+      pos = str.find_first_of(delimiters, start);
+    }
+    if(start < str.length()) // ignore trailing delimiter
+      v.push_back(str.substr(start, pos - start)); // add what's left of the string
+    return v;
+  }
+
+std::string findFormat(uint32_t format, hal::Type imageType )
 {
   switch (format)
     {
-    case pb::PB_LUMINANCE:
-      return sensor_msgs::image_encodings::MONO8;
-    case pb::PB_RGB:
+    case hal::PB_LUMINANCE:
+      if (imageType == hal::PB_UNSIGNED_BYTE)
+	return sensor_msgs::image_encodings::MONO8;
+      else
+	return sensor_msgs::image_encodings::MONO16;
+      
+    case hal::PB_RGB:
       return sensor_msgs::image_encodings::RGB8;
-    case pb::PB_RGBA:
+    case hal::PB_RGBA:
       return sensor_msgs::image_encodings::RGBA8;
-    case pb::PB_RAW:
+    case hal::PB_RAW:
       return sensor_msgs::image_encodings::MONO8;
-    case pb::PB_BGR:
+    case hal::PB_BGR:
       return sensor_msgs::image_encodings::BGR8;
-    case pb::PB_BGRA:
+    case hal::PB_BGRA:
       return sensor_msgs::image_encodings::BGRA8;
     default:
-      ROS_FATAL("Unknown HAL image format: 0x%x\n", format);
+      ROS_FATAL("Unknown HAL image format: 0x%x type: 0x%x\n", format, imageType);
       return NULL;
     }
 }
 
-uint8_t findBytesPerPixel(uint32_t format)
+uint8_t findBytesPerPixel(uint32_t format, hal::Type imageType)
 {
   switch (format)
     {
-    case pb::PB_LUMINANCE:
-    case pb::PB_RAW:
+    case hal::PB_RAW:
       return 1;
-    case pb::PB_BGR:
-    case pb::PB_RGB:
+    case hal::PB_LUMINANCE:
+      if (imageType == hal::PB_UNSIGNED_BYTE)
+	return 1;
+      if (imageType == hal::PB_UNSIGNED_SHORT)
+	return 2;
+      
+    case hal::PB_BGR:
+    case hal::PB_RGB:
       return 3;
-    case pb::PB_RGBA:
-    case pb::PB_BGRA:
+    case hal::PB_RGBA:
+    case hal::PB_BGRA:
       return 4;
     default:
-      ROS_FATAL("Unknown HAL image format: 0x%x\n", format);
+      ROS_FATAL("Unknown HAL image format: 0x%x type: 0x%x\n", format, imageType);
       return 0;
     }
 }
@@ -70,22 +112,27 @@ int main(int argc, char *argv[])
   std::string hal_uri;
   double fps;
   std::string camera_model;
-
+  std::string topicNames;
+  
   ros::init(argc, argv, nodeName);
-  ros::NodeHandle nh("~");
+  ros::NodeHandle nh;
+  ros::NodeHandle p_nh("~");
   image_transport::ImageTransport it(nh);
-  image_transport::CameraPublisher pub = it.advertiseCamera("image", 1);
- 
+  vector<string> topics;
+  vector<hal_camera*> cameras;
+  
   // get params
   hal_uri = defaultURI;
   fps = defaultFPS;
   camera_model = defaultCameraModel;
-
-  nh.getParam("URI",hal_uri);
-  nh.getParam("fps",fps);
-  nh.getParam("camera_model",camera_model);
-
+  topicNames = "/image_raw";
+  
+  p_nh.getParam("URI",hal_uri);
+  p_nh.getParam("fps",fps);
+  p_nh.getParam("camera_model",camera_model);
+  p_nh.getParam("topics",topicNames);
   //Try to find the camera model
+  
   std::string modelFileName = hal::ExpandTildePath(camera_model);
   if (!hal::FileExists(modelFileName))
     {
@@ -94,19 +141,14 @@ int main(int argc, char *argv[])
     }
 
   ROS_INFO("Opening camera model file: %s\n", modelFileName.c_str());
-  calibu::CameraRig rig = calibu::ReadXmlRig( modelFileName);
-  ROS_INFO("Found %lu camera models\n", rig.cameras.size());
+
+  std::shared_ptr<calibu::Rig<double>> rig = calibu::ReadXmlRig( modelFileName);
   
-  const calibu::CameraModel& camModel = rig.cameras[0].camera;
+  ROS_INFO("Found %lu camera models\n", rig->cameras_.size());
 
-  //Retrieve the K matrix
-  Eigen::Matrix<double,3,3> kMatrix = camModel.K();
+  topics = split<string>(topicNames, "+");
 
-  //Save the float64 K matrix out:
-  double *kMatrixRaw = kMatrix.data();
-
-
-  // initiate camera
+  // initiate HAL camera
   std::unique_ptr<hal::Camera> cam;
   try {
     cam.reset(new hal::Camera(hal::Uri(hal_uri)));
@@ -116,39 +158,70 @@ int main(int argc, char *argv[])
   }
 
   ROS_INFO("Opening HAL URI: %s at framerate: %1.1f\n", hal_uri.c_str(), fps);
+  ROS_INFO("Found camera with %lu channels\n", cam->NumChannels());
 
+  if (cam->NumChannels() != rig->cameras_.size())
+    {
+      //The cam is publishing a different number of images than the rig file defines
+      ROS_FATAL("Different number of cam channels and cam models!");
+    }
+
+
+  //Set up ROS publishers
+  for (unsigned int i=0; i< topics.size(); i++)
+    {
+      ROS_INFO("Publishing channel [%d] as [%s]\n", i, topics[i].c_str());
+      hal_camera* newCam = new hal_camera;
+      newCam->pub = it.advertiseCamera(topics[i], 1);
+      
+       //Retrieve the K matrix
+      std::shared_ptr<calibu::CameraInterface<double>> camModel = rig->cameras_[i];
+      Eigen::Matrix<double,3,3> kMatrix = camModel->K();
+      //Save the float64 K matrix out:
+      double *kMatrixRaw = kMatrix.data();
+      memcpy(&newCam->kMatrix[0], kMatrixRaw, 9*sizeof(*kMatrixRaw));
+      newCam->height = cam->Width(i);
+      newCam->width = cam->Height(i);
+      cameras.push_back(newCam);
+    }
 
   // publish images
   ros::Rate loop_rate(fps);
   sensor_msgs::Image rosOut; //ros output
 
+  //Get one round of images from HAL to set up the publishers
+  
   while (nh.ok())
     {
-      std::shared_ptr<pb::ImageArray> vImages = pb::ImageArray::Create();
+      std::shared_ptr<hal::ImageArray> vImages = hal::ImageArray::Create();
 
-      // Get next image from HAL
+      // Get next image set from HAL
       cam->Capture(*vImages);
 	  
-      //Translate the pb::ImageArray into ROS message types
+      //Translate the hal::ImageArray into ROS message types
 	  
-      pb::CameraMsg camMsg = vImages->Ref();
+      hal::CameraMsg camMsg = vImages->Ref();
       for (int ii = 0; ii < camMsg.image_size(); ++ii)
 	{
-	  pb::ImageMsg rawImgMsg = camMsg.image(ii); //hal input
-	  pb::Image rawImg = pb::Image(rawImgMsg);
+	  hal::ImageMsg rawImgMsg = camMsg.image(ii); //hal input
+	  hal::Image rawImg = hal::Image(rawImgMsg);
 
 	  const uint8_t* rawData = (const unsigned char*) rawImg.data();
 	  uint32_t height = rawImgMsg.height();
 	  uint32_t width = rawImgMsg.width();
 
-
-	  fillImage(rosOut, findFormat(rawImgMsg.format()).c_str(), 
+	  string imgFormat =  findFormat(rawImgMsg.format(), rawImgMsg.type());
+	  uint32_t bytesPP =  findBytesPerPixel(rawImgMsg.format(), rawImgMsg.type());
+	  fillImage(rosOut, imgFormat.c_str(), 
 		    height, width, 
-		    findBytesPerPixel(rawImgMsg.format())*width,
+		    bytesPP*width,
 		    rawData);
 
-	  //Add timestamp
-	  rosOut.header.stamp = ros::Time::now();
+	  //TODO: Fill timestamp from the HAL source
+	  
+	  rosOut.header.stamp.sec = (uint64_t) rawImgMsg.timestamp();
+	  rosOut.header.stamp.nsec = (rawImgMsg.timestamp() - rosOut.header.stamp.sec) * 1e9;
+
 
 	  // Push the camera info
 
@@ -157,15 +230,16 @@ int main(int argc, char *argv[])
 	  camera_info.header.frame_id = rosOut.header.frame_id;
 	  camera_info.width = rawImgMsg.width();
 	  camera_info.height = rawImgMsg.height();
-	  memcpy(&camera_info.K,  kMatrixRaw, 9*sizeof(*kMatrixRaw));
+	  memcpy(&camera_info.K,  &cameras[ii]->kMatrix[0], 9*sizeof(double));
 	  camera_info.header.frame_id = rosOut.header.frame_id;
 	  camera_info.header.stamp = rosOut.header.stamp;
-		
-	  pub.publish(rosOut, camera_info);
-	  ros::spinOnce();
-	  loop_rate.sleep();
-	}
 
+	  //Push both the image and its associated camera_info
+	  cameras[ii]->pub.publish(rosOut, camera_info);
+	  
+	}
+      ros::spinOnce();
+      //loop_rate.sleep();
     }
   return 0;
 }

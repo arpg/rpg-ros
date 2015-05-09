@@ -1,9 +1,8 @@
 <launch>
-  <group ns="/">
-    <rosparam file="$(find roscam)/config/roscam_opencv.yaml" command="load"/>	
+  <group ns="/roscam">
+    <rosparam file="$(find roscam)/config/roscam_asusloop.yaml" command="load"/>	
     <node pkg="roscam" name="roscam_node" type="roscam_node" output="screen">
 	<remap from="roscam_node" to="hal_opencv"/>
      </node>
   </group>
 </launch>
-
