@@ -1,6 +1,6 @@
 <launch>
   <group ns="/roscam_aligned">
-    <rosparam file="$(find roscam)/config/roscam_align_hal_local.yaml" command="load"/>	
+    <rosparam file="$(find roscam)/config/roscam_align_hal.yaml" command="load"/>	
     <node pkg="roscam" name="roscam_node" type="roscam_node" output="screen">
 	<remap from="roscam_node" to="hal_opencv"/>
      </node>
