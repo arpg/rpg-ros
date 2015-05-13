@@ -276,21 +276,15 @@ int main(int argc, char *argv[])
 		    bytesPP*width,
 		    rawData);
 
-	  /*
-	  if (imgFormat == sensor_msgs::image_encodings::TYPE_16UC1)
-	    {
-	      //Output a row of data
-	      const uint16_t* imgBase = (const uint16_t*) rawImg.data();
-	      ROS_INFO("Pixel row:");
-	      for (int i=0; i < width; i++)
-		{
-		  cout << imgBase[i+320*width] << " ";
-		}
-	      cout << endl;
-	      
-	    }
-	  */
-	  ros::Time outTime(rawImgMsg.timestamp());
+
+	  ros::Time outTime(camMsg.device_time());
+
+	  //cout << "HAL time: " << rawImgMsg.timestamp() << " ROS time:" << ros::Time::now().toSec() << endl;
+	  //TODO: Correct time stamp propagation,
+	  //Appears to publish something similar to:
+	  //HAL time: 1.02777e+07 ROS time:1.43156e+09
+	  //Further investigation required
+
 	  outTime = ros::Time::now();
 	  
 	  rosOut.header.stamp = outTime;
