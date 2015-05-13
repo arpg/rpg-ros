@@ -269,13 +269,31 @@ int main(int argc, char *argv[])
 
 	  string imgFormat =  findFormat(useCVTypes, rawImgMsg.format(), rawImgMsg.type());
 	  uint32_t bytesPP =  findBytesPerPixel(rawImgMsg.format(), rawImgMsg.type());
+
+	  //ROS_INFO("Publishing image as type: [%s]", imgFormat.c_str());
 	  fillImage(rosOut, imgFormat.c_str(), 
 		    height, width, 
 		    bytesPP*width,
 		    rawData);
 
+	  /*
+	  if (imgFormat == sensor_msgs::image_encodings::TYPE_16UC1)
+	    {
+	      //Output a row of data
+	      const uint16_t* imgBase = (const uint16_t*) rawImg.data();
+	      ROS_INFO("Pixel row:");
+	      for (int i=0; i < width; i++)
+		{
+		  cout << imgBase[i+320*width] << " ";
+		}
+	      cout << endl;
+	      
+	    }
+	  */
+	  ros::Time outTime(rawImgMsg.timestamp());
+	  outTime = ros::Time::now();
 	  
-	  rosOut.header.stamp = ros::Time::now();
+	  rosOut.header.stamp = outTime;
 	  //rosOut.header.stamp.sec = (uint64_t) rawImgMsg.timestamp();
 	  //rosOut.header.stamp.nsec = (rawImgMsg.timestamp() - rosOut.header.stamp.sec) * 1e9;
 	  rosOut.header.frame_id = frames[ii]; //set the frame of the image (when aligned, these need to be the same)
@@ -287,7 +305,19 @@ int main(int argc, char *argv[])
 
 	  camera_info.width = rawImgMsg.width();
 	  camera_info.height = rawImgMsg.height();
-	  memcpy(&camera_info.K,  &cameras[ii]->kMatrix[0], 9*sizeof(double));
+	  camera_info.distortion_model = "plumb_bob";
+	  camera_info.R = {1.0,0.0,0.0,
+			   0.0,1.0,0.0,
+			   0.0,0.0,1.0};
+	  
+	  //memcpy(&camera_info.K,  &cameras[ii]->kMatrix[0], 9*sizeof(double));
+	  camera_info.D = {0.0,0.0,0.0,0.0,0.0};
+	  camera_info.P[0] = camera_info.K[0] = cameras[ii]->kMatrix[0];
+	  camera_info.P[2] = camera_info.K[2] = cameras[ii]->kMatrix[6];
+	  camera_info.P[5] = camera_info.K[4] = cameras[ii]->kMatrix[4];
+	  camera_info.P[6] = camera_info.K[5] = cameras[ii]->kMatrix[7];
+	  camera_info.P[10] = camera_info.K[8] = 1.0;
+	  
 	  camera_info.header.frame_id = frames[ii]; //set the frame of the image (when aligned, these need to be the same)
 	  camera_info.header.stamp = rosOut.header.stamp;
 

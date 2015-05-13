@@ -12,6 +12,7 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   image_transport
   std_msgs
+  pcl_ros
 )
 
 ## System dependencies are found with CMake's conventions
@@ -118,6 +119,7 @@ include_directories(
 
 ## Declare a cpp executable
  add_executable(roscam_node src/roscam_node.cpp)
+ add_executable(pcl_output src/pcl_output.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
@@ -133,7 +135,16 @@ include_directories(
    dl
 
  )
+ 
+ target_link_libraries(pcl_output
+   ${catkin_LIBRARIES}
+   ${HAL_LIBRARIES}
+   ${Calibu_LIBRARIES}
+   ${eigen_LIBRARIES}	
+   protobuf
+   dl
 
+ )
 #############
 ## Install ##
 #############
