@@ -35,6 +35,8 @@ struct hal_camera
   double kMatrix[9];
   uint32_t height;
   uint32_t width;
+  std::string frameID;   //For depth processing, need to declare that the depth image is in the same frame
+  //as the rgb image
   image_transport::CameraPublisher pub;
 };
 
@@ -56,29 +58,57 @@ vector<T> split(const T & str, const T & delimiters)
     return v;
   }
 
-std::string findFormat(uint32_t format, hal::Type imageType )
+std::string findFormat(int useCVTypes, uint32_t format, hal::Type imageType )
 {
-  switch (format)
+  if (useCVTypes == 1)
     {
-    case hal::PB_LUMINANCE:
-      if (imageType == hal::PB_UNSIGNED_BYTE)
-	return sensor_msgs::image_encodings::MONO8;
-      else
-	return sensor_msgs::image_encodings::MONO16;
+      switch (format)
+	{
+	case hal::PB_LUMINANCE:
+	  if (imageType == hal::PB_UNSIGNED_BYTE)
+	    return sensor_msgs::image_encodings::TYPE_8UC1;
+	  else
+	    return sensor_msgs::image_encodings::TYPE_16UC1;
       
-    case hal::PB_RGB:
-      return sensor_msgs::image_encodings::RGB8;
-    case hal::PB_RGBA:
-      return sensor_msgs::image_encodings::RGBA8;
-    case hal::PB_RAW:
-      return sensor_msgs::image_encodings::MONO8;
-    case hal::PB_BGR:
-      return sensor_msgs::image_encodings::BGR8;
-    case hal::PB_BGRA:
-      return sensor_msgs::image_encodings::BGRA8;
-    default:
-      ROS_FATAL("Unknown HAL image format: 0x%x type: 0x%x\n", format, imageType);
-      return NULL;
+	case hal::PB_RGB:
+	  return sensor_msgs::image_encodings::RGB8;
+	case hal::PB_RGBA:
+	  return sensor_msgs::image_encodings::RGBA8;
+	case hal::PB_RAW:
+	  return sensor_msgs::image_encodings::TYPE_8UC1;
+	case hal::PB_BGR:
+	  return sensor_msgs::image_encodings::BGR8;
+	case hal::PB_BGRA:
+	  return sensor_msgs::image_encodings::BGRA8;
+	default:
+	  ROS_FATAL("Unknown HAL image format: 0x%x type: 0x%x\n", format, imageType);
+	  return NULL;
+	}
+    }
+  else
+    {
+      switch (format)
+	{
+	case hal::PB_LUMINANCE:
+	  if (imageType == hal::PB_UNSIGNED_BYTE)
+	    return sensor_msgs::image_encodings::MONO8;
+	  else
+	    return sensor_msgs::image_encodings::MONO16;
+      
+	case hal::PB_RGB:
+	  return sensor_msgs::image_encodings::RGB8;
+	case hal::PB_RGBA:
+	  return sensor_msgs::image_encodings::RGBA8;
+	case hal::PB_RAW:
+	  return sensor_msgs::image_encodings::MONO8;
+	case hal::PB_BGR:
+	  return sensor_msgs::image_encodings::BGR8;
+	case hal::PB_BGRA:
+	  return sensor_msgs::image_encodings::BGRA8;
+	default:
+	  ROS_FATAL("Unknown HAL image format: 0x%x type: 0x%x\n", format, imageType);
+	  return NULL;
+	}
     }
 }
 
@@ -113,25 +143,34 @@ int main(int argc, char *argv[])
   double fps;
   std::string camera_model;
   std::string topicNames;
+  std::string frameIDs;
   
   ros::init(argc, argv, nodeName);
+
   ros::NodeHandle nh;
   ros::NodeHandle p_nh("~");
   image_transport::ImageTransport it(nh);
   vector<string> topics;
+  vector<string> frames;
   vector<hal_camera*> cameras;
+  int useCVTypes = 1;
   
   // get params
   hal_uri = defaultURI;
   fps = defaultFPS;
   camera_model = defaultCameraModel;
   topicNames = "/image_raw";
+  frameIDs = "camera_frame";
   
   p_nh.getParam("URI",hal_uri);
   p_nh.getParam("fps",fps);
   p_nh.getParam("camera_model",camera_model);
   p_nh.getParam("topics",topicNames);
+  p_nh.getParam("frames", frameIDs);
+  p_nh.getParam("useCVTypes", useCVTypes);
   //Try to find the camera model
+
+  ROS_INFO("Use OpenCV types in output encoding?: %d\n", useCVTypes);
   
   std::string modelFileName = hal::ExpandTildePath(camera_model);
   if (!hal::FileExists(modelFileName))
@@ -147,7 +186,22 @@ int main(int argc, char *argv[])
   ROS_INFO("Found %lu camera models\n", rig->cameras_.size());
 
   topics = split<string>(topicNames, "+");
+  frames = split<string>(frameIDs, "+");
 
+  if (topics.size() != rig->cameras_.size())
+    {
+      ROS_FATAL("Number of topics [%lu] mismatched to number of cameras defined in rig file [%lu]!",
+		topics.size(), rig->cameras_.size());
+      return -1;
+    }
+
+  if (frames.size() != topics.size())
+    {
+      ROS_FATAL("Number of topics [%lu] mismatched to number of coordinate frames [%lu]!",
+		topics.size(), frames.size());
+      return -1;
+    }
+  
   // initiate HAL camera
   std::unique_ptr<hal::Camera> cam;
   try {
@@ -163,7 +217,9 @@ int main(int argc, char *argv[])
   if (cam->NumChannels() != rig->cameras_.size())
     {
       //The cam is publishing a different number of images than the rig file defines
-      ROS_FATAL("Different number of cam channels and cam models!");
+      ROS_FATAL("Different number of cam channels [%lu] and cam models [%lu]!",
+		cam->NumChannels(), rig->cameras_.size());
+      return -1;
     }
 
 
@@ -182,6 +238,7 @@ int main(int argc, char *argv[])
       memcpy(&newCam->kMatrix[0], kMatrixRaw, 9*sizeof(*kMatrixRaw));
       newCam->height = cam->Width(i);
       newCam->width = cam->Height(i);
+      newCam->frameID = frames[i];
       cameras.push_back(newCam);
     }
 
@@ -210,28 +267,28 @@ int main(int argc, char *argv[])
 	  uint32_t height = rawImgMsg.height();
 	  uint32_t width = rawImgMsg.width();
 
-	  string imgFormat =  findFormat(rawImgMsg.format(), rawImgMsg.type());
+	  string imgFormat =  findFormat(useCVTypes, rawImgMsg.format(), rawImgMsg.type());
 	  uint32_t bytesPP =  findBytesPerPixel(rawImgMsg.format(), rawImgMsg.type());
 	  fillImage(rosOut, imgFormat.c_str(), 
 		    height, width, 
 		    bytesPP*width,
 		    rawData);
 
-	  //TODO: Fill timestamp from the HAL source
 	  
-	  rosOut.header.stamp.sec = (uint64_t) rawImgMsg.timestamp();
-	  rosOut.header.stamp.nsec = (rawImgMsg.timestamp() - rosOut.header.stamp.sec) * 1e9;
-
+	  rosOut.header.stamp = ros::Time::now();
+	  //rosOut.header.stamp.sec = (uint64_t) rawImgMsg.timestamp();
+	  //rosOut.header.stamp.nsec = (rawImgMsg.timestamp() - rosOut.header.stamp.sec) * 1e9;
+	  rosOut.header.frame_id = frames[ii]; //set the frame of the image (when aligned, these need to be the same)
 
 	  // Push the camera info
 
-
+	  //For the alignment to work, the frame_id needs to be adjusted (potentially)
 	  sensor_msgs::CameraInfo camera_info;
-	  camera_info.header.frame_id = rosOut.header.frame_id;
+
 	  camera_info.width = rawImgMsg.width();
 	  camera_info.height = rawImgMsg.height();
 	  memcpy(&camera_info.K,  &cameras[ii]->kMatrix[0], 9*sizeof(double));
-	  camera_info.header.frame_id = rosOut.header.frame_id;
+	  camera_info.header.frame_id = frames[ii]; //set the frame of the image (when aligned, these need to be the same)
 	  camera_info.header.stamp = rosOut.header.stamp;
 
 	  //Push both the image and its associated camera_info

@@ -4,5 +4,37 @@
     <node pkg="roscam" name="roscam_node" type="roscam_node" output="screen">
 	<remap from="roscam_node" to="hal_opencv"/>
      </node>
+
+   <!-- Start nodelet manager in top-level namespace -->
+    <arg name="manager" value="roscam_nodelet_manager" />
+    <arg name="debug" default="false" /> <!-- Run manager in GDB? -->
+    <!-- Worker threads for the nodelet manager -->
+    <arg name="num_worker_threads" default="4" />
+    <arg name="respawn" default="false" />
+
+
+    <include file="$(find rgbd_launch)/launch/includes/manager.launch.xml">
+      <arg name="name"                value="$(arg manager)" />
+      <arg name="debug"               value="$(arg debug)" />
+      <arg name="num_worker_threads"  value="$(arg num_worker_threads)" />
+    </include>
+    
+    <arg name="rgb"               value="/asus_one"/>
+    <arg name="depth"             value="/asus_two" />
+    <arg name="depth_registered" default="/asus_two" />
+
+        <!-- Publish registered XYZRGB point cloud with software registered input -->
+    <node pkg="nodelet" type="nodelet" name="points_xyzrgb_sw_registered"
+          args="load depth_image_proc/point_cloud_xyzrgb $(arg manager)"
+          respawn="$(arg respawn)" output="screen">
+      <!-- Explicit topic remappings, shouldn't need all of these -->
+      <remap from="rgb/image_rect_color"        to="$(arg rgb)/image_rect_color" />
+      <remap from="rgb/camera_info"       to="$(arg rgb)/camera_info" />
+      <remap from="depth_registered/image_rect"      to="$(arg depth_registered)/image_rect_raw" />
+      <remap from="depth_registered/points"     to="$(arg depth_registered)/points" />
+    </node>
+	
+    <node pkg="tf" type="static_transform_publisher" name="asus_base_link"
+     args="0 -0.02  0 0 0 0 rgb_optical_frame world 100" /> 
   </group>
 </launch>
