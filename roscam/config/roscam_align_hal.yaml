@@ -1,4 +1,4 @@
-roscam_node: {useCVTypes: 1, URI: "openni:[align=0]//", fps: 30, topics: "/asus_one/image_rect_color+/asus_two/image_rect_raw",
-camera_model: "/home/smcguire/catkin_ws/src/roscam/config/two_cams.xml", frames: "/rgb_optical_frame+/rgb_optical_frame"}
+roscam_node: {useCVTypes: 1, URI: "openni:[align=0,cmod=/home/smcguire/catkin_ws/src/roscam/config/xtion.xml]//", fps: 30, topics: "/asus_one/image_rect_color+/asus_two/image_rect_raw",
+camera_model: "/home/smcguire/catkin_ws/src/roscam/config/xtion.xml", frames: "/rgb_optical_frame+/rgb_optical_frame"}
 
 

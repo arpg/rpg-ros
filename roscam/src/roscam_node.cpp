@@ -145,7 +145,7 @@ int main(int argc, char *argv[])
   std::string topicNames;
   std::string frameIDs;
   
-  ros::init(argc, argv, nodeName);
+  ros::init(argc, argv, nodeName, ros::init_options::AnonymousName);
 
   ros::NodeHandle nh;
   ros::NodeHandle p_nh("~");
