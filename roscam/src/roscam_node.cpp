@@ -16,6 +16,7 @@
 
 #include <HAL/Image.pb.h>
 #include <HAL/Messages/ImageArray.h>
+#include <HAL/Utils/TicToc.h>
 
 #include <ros/ros.h>
 #include <ros/console.h>
@@ -247,11 +248,10 @@ int main(int argc, char *argv[])
   sensor_msgs::Image rosOut; //ros output
 
   //Get one round of images from HAL to set up the publishers
-  
+  std::shared_ptr<hal::ImageArray> vImages = hal::ImageArray::Create();
+
   while (nh.ok())
     {
-      std::shared_ptr<hal::ImageArray> vImages = hal::ImageArray::Create();
-
       // Get next image set from HAL
       cam->Capture(*vImages);
 	  
@@ -276,16 +276,18 @@ int main(int argc, char *argv[])
 		    bytesPP*width,
 		    rawData);
 
+	  
 
-	  ros::Time outTime(camMsg.device_time());
-
-	  //cout << "HAL time: " << rawImgMsg.timestamp() << " ROS time:" << ros::Time::now().toSec() << endl;
+	  //cout << "Sec: " << ts.tv_sec << "NSec: " << ts.tv_nsec << " HAL time: " << vImages->SystemTime() <<
+	  //  " ROS time:" << ros::Time::now().toSec() << endl;
 	  //TODO: Correct time stamp propagation,
 	  //Appears to publish something similar to:
 	  //HAL time: 1.02777e+07 ROS time:1.43156e+09
 	  //Further investigation required
-
-	  outTime = ros::Time::now();
+	  //HAL's Tic() used CLOCK_MONOTONIC, which is not a time value in the Unix sense
+	  //Changed to CLOCK_REALTIME to get compatible time information
+	  
+	  ros::Time outTime(vImages->SystemTime());
 	  
 	  rosOut.header.stamp = outTime;
 	  //rosOut.header.stamp.sec = (uint64_t) rawImgMsg.timestamp();
@@ -319,8 +321,9 @@ int main(int argc, char *argv[])
 	  cameras[ii]->pub.publish(rosOut, camera_info);
 	  
 	}
+      
       ros::spinOnce();
-      //loop_rate.sleep();
+      loop_rate.sleep();
     }
   return 0;
 }

@@ -1,0 +1,2 @@
+roscam_node: {URI: "ximea://", fps: 60, topic: "/ximea_left", camera_model: 
+"/home/smcguire/catkin_ws/src/roscam/config/ximea.xml"}

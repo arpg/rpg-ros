@@ -13,6 +13,7 @@ find_package(catkin REQUIRED COMPONENTS
   image_transport
   std_msgs
   pcl_ros
+  openni2_camera
 )
 
 ## System dependencies are found with CMake's conventions
@@ -120,6 +121,7 @@ include_directories(
 ## Declare a cpp executable
  add_executable(roscam_node src/roscam_node.cpp)
  add_executable(pcl_output src/pcl_output.cpp)
+# add_executable(list_devices src/list_devices.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
@@ -145,6 +147,10 @@ include_directories(
    dl
 
  )
+
+#target_link_libraries(list_devices
+#   ${catkin_LIBRARIES}
+# )
 #############
 ## Install ##
 #############
