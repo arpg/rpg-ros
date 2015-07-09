@@ -33,6 +33,7 @@ def usage():
  	print "                   - gps_common/gpsVel  "
  	print "                   - umrr_driver/radar_msg  "
         print "                   - husky_msgs/HuskyWheelTick "
+        print "                   - ar_track_alvar_msgs/AlvarMarkers"
  	print ""
  	print "  Rosbag Extraction Script v1 - Shane Lynn - 3rd May 2012"
         print "  Updated 6/19/2015 - Steve McGuire, to include add'l message and for OpenCV2"
@@ -90,17 +91,22 @@ def getHeader(msg):
 					"Target_Range", "Target_Angle", "Target_RadialSpeed", "Target_Signal2Threshold", "Target_Type"]
 	elif (msgType == '_husky_msgs__HuskyWheelTick'):
 		headerRow = ["Time", "Header_sequence", "Header_secs", "Header_nsecs", \
-					"Channel0", "Channel1"]	
+					"Channel0", "Channel1"]
+        elif (msgType == '_ar_track_alvar_msgs__AlvarMarkers'):
+		headerRow = ["Time", "Header_sequence", "Header_secs", "Header_nsecs", \
+					"MarkerID", "Pose_x", "Pose_y", "Pose_z"]	       
 	else:
-		rospy.logerr("Unsupport Message type %s"%msgType)
+		rospy.logerr("Unsupported Message type %s"%msgType)
 		usage()
 		sys.exit(2)
 	
 	return headerRow, isImage
 
 
-def getColumns(t, msg, imageFile = ""):
+def getColumns(t, msg, fileWriter):
 	#this function gets the data that is necessary for the csv file - one row at a time from the current msg.
+        #Supports writing multiple rows so that a many rows <-> one message thing can go on
+        
 	msgType = str(type(msg))	
 	msgType = msgType[msgType.index('.')+1:]	
 	msgType = msgType[:msgType.index('\'')]	
@@ -114,35 +120,50 @@ def getColumns(t, msg, imageFile = ""):
 		if len(msg.intensities) >= 1:
 			for i in range(len(msg.intensities)): 
 				columns.append(msg.intensities[i])
-				
+
+		fileWriter.writerow(columns)
+	        
 	elif (msgType == '_sensor_msgs__Imu'):
 		columns = [t, msg.header.seq, msg.header.stamp.secs, msg.header.stamp.nsecs, \
 		                     msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w, \
 		                     msg.angular_velocity.x, msg.angular_velocity.y, msg.angular_velocity.z, \
 		                     msg.linear_acceleration.x, msg.linear_acceleration.y, msg.linear_acceleration.z]
+                fileWriter.writerow(columns)
         elif (msgType == '_gemoetry_msgs__PoseStamped'):
 		columns = [t, msg.header.seq, msg.header.stamp.secs, msg.header.stamp.nsecs, \
                            msg.pose.x, msg.pose.y, msg.pose.z, \
                            msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w]
-		
+		fileWriter.writerow(columns)
 	elif (msgType == '_sensor_msgs__NavSatFix'):
 		columns = [t, msg.header.seq, msg.header.stamp.secs, msg.header.stamp.nsecs, \
 		                     msg.latitude, msg.longitude, msg.altitude, msg.position_covariance]
-		
+		fileWriter.writerow(columns)
 	elif (msgType == '_gps_common__GPSFix'):
 		columns =[t, msg.header.seq, msg.header.stamp.secs, msg.header.stamp.nsecs, msg.status.status, \
 		                     msg.latitude, msg.longitude, msg.altitude, msg.position_covariance, msg.position_covariance_type, \
 		                     msg.track, msg.speed, msg.climb, msg.time, msg.pitch, msg.roll, msg.dip ]
+                fileWriter.writerow(columns)
+                
 	elif (msgType == '_sensor_msgs__Image'):
-		columns = [t, msg.header.seq, msg.header.stamp.secs, msg.header.stamp.nsecs, imageFile]
+		columns = [t, msg.header.seq, msg.header.stamp.secs, msg.header.stamp.nsecs]
 	
 	elif (msgType == '_umrr_driver__radar_msg'):
 		columns = [t, msg.header.seq, msg.header.stamp.secs, msg.header.stamp.nsecs, \
 					msg.sensorID, msg.numTargets, msg.mode, msg.submode, msg.status, \
 					msg.targetRange, msg.targetAngle, msg.targetRadialSpeed, msg.targetSig2Threhold, msg.targetType ]
+                fileWriter.writerow(columns)
+                
 	elif (msgType == '_husky_msgs__HuskyWheelTick'):
 		columns = [t, msg.header.seq, msg.header.stamp.secs, msg.header.stamp.nsecs, \
                            msg.tickCount[0], msg.tickCount[1]]
+                fileWriter.writerow(columns)
+        elif (msgType == '_ar_track_alvar_msgs__AlvarMarkers'):
+                for i in range(len(msg.markers)): 
+                        columns = [t, msg.header.seq, msg.markers[i].header.stamp.secs, msg.markers[i].header.stamp.nsecs, \
+                                   msg.markers[i].id, msg.markers[i].pose.pose.position.x, \
+                                   msg.markers[i].pose.pose.position.y, \
+                                   msg.markers[i].pose.pose.position.z]
+                        fileWriter.writerow(columns)
 	else:
 		rospy.logerror("Unexpected error - AGH!")
 		usage()
@@ -223,14 +244,17 @@ def main():
 				fileWriter.writerow(headerRow)
 				
 		#get the columns for the csv file.
-		columns = getColumns(t, msg, imageFile)
+		columns = getColumns(t, msg, fileWriter)
 									
 		#if we are dealing with image data - we also need to write the image file.
+                #This is set for the entire topic that we may be reading
+
+                #Images will only return columns that represent a single image's timestamps
 		if isImage:			
 			try:
 				cvImage = bridge.imgmsg_to_cv2(msg, "passthrough")
 			except CvBridgeError, err:
-	        			print err
+	        		print err
 			
 			#imageFile = 'Image_%.4d'%count			
 			saveFileName = str(outDir)+"/"+ topicSplits[1] + "-{0:09d}".format(columns[2])+"."+"{0:09d}".format(columns[3]) + ".pgm"
@@ -238,7 +262,7 @@ def main():
 			
 
 		#write the columns or image to the file/folder.
-		fileWriter.writerow(columns)
+		#fileWriter.writerow(columns)
 		
 		#keep track of the number of records processed
 		count = count + 1

@@ -29,14 +29,17 @@ def usage():
  	print "                   - gps_common/gpsVel  "
  	print "                   - umrr_driver/radar_msg  "
         print "                   - husky_msgs/HuskyWheelTick "
+        print "                   - ar_track_alvar_msgs/AlvarMarkers"
  	print ""
  	print "  Rosbag Extraction Script v1 - Shane Lynn - 7th May 2012"
         print "  Updated 6/19 - Steve McGuire, to include add'l message and for OpenCV2"
+        print "  Updated 7/9 - Steve McGuire, to include ar_track_alvar"
  	print ""
  	print " ---------------------------------------------------------------------------------------------"
 
 allowedTopics = ['sensor_msgs/Image', 'sensor_msgs/Imu', 'sensor_msgs/LaserScan', 'sensor_msgs/NavSatFix', \
-			'gps_common/GPSFix', 'umrr_driver/radar_msg', 'husky_msgs/HuskyWheelTick']	
+			'gps_common/GPSFix', 'umrr_driver/radar_msg', 'husky_msgs/HuskyWheelTick', \
+                 'ar_track_alvar_msgs/AlvarMarkers']	
 
 def main():
 	rospy.loginfo("Processing input arguments:")
@@ -91,7 +94,8 @@ def main():
 		if process == True:
 			rospy.loginfo("Processing topic...")
 			rospy.loginfo("----------------------- Starting TOPIC_EXTRACT.PY for %s --------------------------"%topicName)
-			fileName =  topicName.replace("/", "-")			
+			fileName =  topicName.replace("/", "-")
+		        fileName = fileName[1:]
 			commandLine = "rosrun data_extraction extract_topic.py -b " + rosbagFile + " -o " + outDir + "/" + fileName + ".csv" + " -t " + topicName		
 			os.system(commandLine)
 			rospy.loginfo("----------------------- Finished TOPIC_EXTRACT.PY for %s --------------------------"%topicName)
