@@ -243,6 +243,8 @@ int main(int argc, char *argv[])
       cameras.push_back(newCam);
     }
 
+  ROS_INFO("Topics published, beginning loop");
+
   // publish images
   ros::Rate loop_rate(fps);
   sensor_msgs::Image rosOut; //ros output
@@ -286,7 +288,9 @@ int main(int argc, char *argv[])
 	  //Further investigation required
 	  //HAL's Tic() used CLOCK_MONOTONIC, which is not a time value in the Unix sense
 	  //Changed to CLOCK_REALTIME to get compatible time information
-	  
+
+	  //Could also construct from the source vImages->system_time and device_time
+	  //Drivers are all over the place when it comes to timing
 	  ros::Time outTime(vImages->SystemTime());
 	  
 	  rosOut.header.stamp = outTime;
