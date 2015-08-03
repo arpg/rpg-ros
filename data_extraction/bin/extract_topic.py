@@ -29,11 +29,13 @@ def usage():
  	print "                   - sensor_msgs/Imu "        
  	print "                   - sensor_msgs/LaserScan "
  	print "                   - sensor_msgs/NavSatFix "
+        print "                   - sensor_msgs/JointState "
         print "                   - geometry_msgs/PoseStamped "
  	print "                   - gps_common/gpsVel  "
  	print "                   - umrr_driver/radar_msg  "
         print "                   - husky_msgs/HuskyWheelTick "
         print "                   - ar_track_alvar_msgs/AlvarMarkers"
+        print "                   - nav_msgs/Odometry"
  	print ""
  	print "  Rosbag Extraction Script v1 - Shane Lynn - 3rd May 2012"
         print "  Updated 6/19/2015 - Steve McGuire, to include add'l message and for OpenCV2"
@@ -71,7 +73,11 @@ def getHeader(msg):
 	elif (msgType == '_geometry_msgs__PoseStamped'):
 		headerRow = ["Time", "Header_sequence", "Header_secs", "Header_nsecs", \
 		                 "Pose_x", "Pose_y", "Pose_z", "Orientation_x", \
-		                 "Orientation_y", "Orientation_z", "Orientation_w"]	
+		                 "Orientation_y", "Orientation_z", "Orientation_w"]
+	elif (msgType == '_nav_msgs__Odometry'):
+		headerRow = ["Time", "Header_sequence", "Header_secs", "Header_nsecs", \
+		                 "Pose_x", "Pose_y", "Pose_z", "Orientation_x", \
+		                 "Orientation_y", "Orientation_z", "Orientation_w"]
 	elif (msgType == '_sensor_msgs__NavSatFix'):
 		headerRow = ["Time", "Header_sequence", "Header_secs", "Header_nsecs", \
 		                 "Latitude", "Longitude", "Altitude", "PositionCovariance"]
@@ -95,7 +101,13 @@ def getHeader(msg):
         elif (msgType == '_ar_track_alvar_msgs__AlvarMarkers'):
 		headerRow = ["Time", "Header_sequence", "Header_secs", "Header_nsecs", \
 					"MarkerID", "Pose_x", "Pose_y", "Pose_z"]	       
-	else:
+	elif (msgType == '_sensor_msgs__JointState'):
+		headerRow = ["Time", "Header_sequence", "Header_secs", "Header_nsecs"]
+		for i in range(len(msg.name)):
+			headerRow.append("%s_Pos"%(msg.name[i]))
+                        headerRow.append("%s_Vel"%(msg.name[i]))
+                        headerRow.append("%s_Effort"%(msg.name[i]))
+        else:
 		rospy.logerr("Unsupported Message type %s"%msgType)
 		usage()
 		sys.exit(2)
@@ -129,10 +141,15 @@ def getColumns(t, msg, fileWriter):
 		                     msg.angular_velocity.x, msg.angular_velocity.y, msg.angular_velocity.z, \
 		                     msg.linear_acceleration.x, msg.linear_acceleration.y, msg.linear_acceleration.z]
                 fileWriter.writerow(columns)
-        elif (msgType == '_gemoetry_msgs__PoseStamped'):
+        elif (msgType == '_geometry_msgs__PoseStamped'):
 		columns = [t, msg.header.seq, msg.header.stamp.secs, msg.header.stamp.nsecs, \
                            msg.pose.x, msg.pose.y, msg.pose.z, \
                            msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w]
+		fileWriter.writerow(columns)
+        elif (msgType == '_nav_msgs__Odometry'):
+		columns = [t, msg.header.seq, msg.header.stamp.secs, msg.header.stamp.nsecs, \
+                           msg.pose.pose.position.x, msg.pose.pose.position.y, msg.pose.pose.position.z, \
+                           msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w]
 		fileWriter.writerow(columns)
 	elif (msgType == '_sensor_msgs__NavSatFix'):
 		columns = [t, msg.header.seq, msg.header.stamp.secs, msg.header.stamp.nsecs, \
@@ -164,7 +181,15 @@ def getColumns(t, msg, fileWriter):
                                    msg.markers[i].pose.pose.position.y, \
                                    msg.markers[i].pose.pose.position.z]
                         fileWriter.writerow(columns)
-	else:
+	elif (msgType == '_sensor_msgs__JointState'):
+		columns = [t, msg.header.seq, msg.header.stamp.secs, msg.header.stamp.nsecs]
+                for i in range(len(msg.name)):
+			columns.append(msg.position[i])
+                        columns.append(msg.velocity[i])
+                        columns.append(msg.effort[i])
+                                         
+		fileWriter.writerow(columns)
+        else:
 		rospy.logerror("Unexpected error - AGH!")
 		usage()
 		sys.exit(2)
