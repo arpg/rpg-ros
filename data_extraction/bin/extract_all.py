@@ -41,7 +41,7 @@ def usage():
 
 allowedTopics = ['sensor_msgs/Image', 'sensor_msgs/Imu', 'sensor_msgs/LaserScan', 'sensor_msgs/NavSatFix', \
 			'gps_common/GPSFix', 'umrr_driver/radar_msg', 'husky_msgs/HuskyWheelTick', \
-                 'ar_track_alvar_msgs/AlvarMarkers', 'sensor_msgs/JointState', 'nav_msgs/Odometry']	
+                 'ar_track_alvar_msgs/AlvarMarkers', 'sensor_msgs/JointState', 'nav_msgs/Odometry', 'geometry_msgs/TransformStamped']	
 
 def main():
 	rospy.loginfo("Processing input arguments:")

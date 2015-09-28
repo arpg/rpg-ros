@@ -31,6 +31,7 @@ def usage():
  	print "                   - sensor_msgs/NavSatFix "
         print "                   - sensor_msgs/JointState "
         print "                   - geometry_msgs/PoseStamped "
+        print "                   - geometry_msgs/TransformStamped "
  	print "                   - gps_common/gpsVel  "
  	print "                   - umrr_driver/radar_msg  "
         print "                   - husky_msgs/HuskyWheelTick "
@@ -74,6 +75,10 @@ def getHeader(msg):
 		headerRow = ["Time", "Header_sequence", "Header_secs", "Header_nsecs", \
 		                 "Pose_x", "Pose_y", "Pose_z", "Orientation_x", \
 		                 "Orientation_y", "Orientation_z", "Orientation_w"]
+        elif (msgType == '_geometry_msgs__TransformStamped'):
+		headerRow = ["Time", "Header_sequence", "Header_secs", "Header_nsecs", \
+		                 "Pose_x", "Pose_y", "Pose_z", "Orientation_x", \
+		                 "Orientation_y", "Orientation_z", "Orientation_w"]        
 	elif (msgType == '_nav_msgs__Odometry'):
 		headerRow = ["Time", "Header_sequence", "Header_secs", "Header_nsecs", \
 		                 "Pose_x", "Pose_y", "Pose_z", "Orientation_x", \
@@ -146,6 +151,11 @@ def getColumns(t, msg, fileWriter):
                            msg.pose.x, msg.pose.y, msg.pose.z, \
                            msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w]
 		fileWriter.writerow(columns)
+        elif (msgType == '_geometry_msgs__TransformStamped'):
+		columns = [t, msg.header.seq, msg.header.stamp.secs, msg.header.stamp.nsecs, \
+                           msg.transform.translation.x, msg.transform.translation.y, msg.transform.translation.z, \
+                           msg.transform.rotation.x, msg.transform.rotation.y, msg.transform.rotation.z, msg.transform.rotation.w]
+		fileWriter.writerow(columns) 
         elif (msgType == '_nav_msgs__Odometry'):
 		columns = [t, msg.header.seq, msg.header.stamp.secs, msg.header.stamp.nsecs, \
                            msg.pose.pose.position.x, msg.pose.pose.position.y, msg.pose.pose.position.z, \
@@ -163,6 +173,7 @@ def getColumns(t, msg, fileWriter):
                 
 	elif (msgType == '_sensor_msgs__Image'):
 		columns = [t, msg.header.seq, msg.header.stamp.secs, msg.header.stamp.nsecs]
+                fileWriter.writerow(columns)
 	
 	elif (msgType == '_umrr_driver__radar_msg'):
 		columns = [t, msg.header.seq, msg.header.stamp.secs, msg.header.stamp.nsecs, \
