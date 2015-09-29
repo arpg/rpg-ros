@@ -379,6 +379,8 @@ public:
          jaguarMotionDriver_->sendMotorCtrlAllCmd(PWM,flipperPWM_f, flipperPWM_r, NOCONTROL, forwardPWM,turnPWM, NOCONTROL );
 	 jaguarMotionDriver_->enableMotorCmd(0); //for flipper
 	 jaguarMotionDriver_->enableMotorCmd(1); //for flipper
+	 jaguarMotionDriver_->enableMotorCmd(3); //for linear
+	 jaguarMotionDriver_->enableMotorCmd(4); //for angular
       }
 
     }

@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(jaguar)
+##set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -Wextra")
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -114,6 +115,8 @@ include_directories(
 ## Declare a cpp executable
 add_executable(jaguar_node src/jaguar_node.cpp src/jaguar_base.cpp)
 add_executable(jaguar_joystick src/jaguar_joystick.cpp)
+add_executable(jaguar_test src/jaguar_test.cpp src/jaguar_base.cpp)
+
 #add_executable(jaguar_msgtest src/jaguar_msgtest.cpp)
 
 ## Add cmake target dependencies of the executable/library
@@ -126,6 +129,8 @@ add_dependencies(jaguar_joystick jaguar_generate_messages_cpp)
 ## Specify libraries to link a library or executable target against
  target_link_libraries(jaguar_node ${catkin_LIBRARIES})
  target_link_libraries(jaguar_joystick ${catkin_LIBRARIES})
+ target_link_libraries(jaguar_test ${catkin_LIBRARIES})		
+
 # target_link_libraries(jaguar_msgtest ${catkin_LIBRARIES})
 #############
 ## Install ##
@@ -166,11 +171,6 @@ add_dependencies(jaguar_joystick jaguar_generate_messages_cpp)
 ## Testing ##
 #############
 
-## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_jaguar.cpp)
-# if(TARGET ${PROJECT_NAME}-test)
-#   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
-# endif()
 
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)

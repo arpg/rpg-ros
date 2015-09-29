@@ -50,7 +50,8 @@ JaguarBase::MotionSensorDriver::MotionSensorDriver()
 
   _stopComm = true;
   _comCnt = 0;
-  _mutex_Data_Buf = PTHREAD_MUTEX_INITIALIZER;
+  _mutex_Data_Buf = new pthread_mutex_t;
+  pthread_mutex_init(_mutex_Data_Buf, NULL);
   _eCommState = Disconnected;
   _desID = COM_TYPE_MOT;
   _pcID = COM_TYPE_PC;
@@ -227,9 +228,11 @@ int JaguarBase::MotionSensorDriver::openNetwork(const char* robotIP, const int p
 
 //communication thread here
 void JaguarBase::MotionSensorDriver::commWorkingThread(){
+
+  
   while(!_stopComm)
   {
-     if (_robotConfig->commMethod == Network)
+      if (_robotConfig->commMethod == Network)
      {
 
       FD_ZERO(&_readfds);
@@ -395,6 +398,7 @@ void JaguarBase::MotionSensorDriver::DealWithPacket(const unsigned char *lpComDa
 {
   char debugtemp[512] ;
   int temp;
+  debugCommMessage("Got a valid packet, decoding\n");
   if ( (lpComData[INDEX_STX0] != COM_STX0)||
                    (lpComData[INDEX_STX1] != COM_STX1)
              )
@@ -476,7 +480,7 @@ void JaguarBase::MotionSensorDriver::DealWithPacket(const unsigned char *lpComDa
               break ;
             case COMTYPE_MOTOR_SENSOR:
               debugCommMessage("receive motor sensor data packet!\n");
-              pthread_mutex_lock(&_mutex_Data_Buf);
+              pthread_mutex_lock(_mutex_Data_Buf);
               for (int i = 0; i < MOTORSENSOR_NUM; i ++)
               {
                 _motorSensorData.motorSensorPot[i] = lpComData[INDEX_DATA + 2 * i] + lpComData[INDEX_DATA + 2 * i + 1] * 256;
@@ -513,10 +517,10 @@ void JaguarBase::MotionSensorDriver::DealWithPacket(const unsigned char *lpComDa
               {
                 _motorSensorData.motorSensorEncoderDir[1] = -1;
               }
-              pthread_mutex_unlock(&_mutex_Data_Buf);
+              pthread_mutex_unlock(_mutex_Data_Buf);
               break;
             case COMTYPE_CUSTOM_SENSOR:
-              pthread_mutex_lock(&_mutex_Data_Buf);
+              pthread_mutex_lock(_mutex_Data_Buf);
               for (int i = 0; i < CUSTOMSENSOR_NUM ; i ++)
               {
                 _customSensorData.customADData [i]  = lpComData[INDEX_DATA + 2 * i] + lpComData[INDEX_DATA + 2 * i + 1] * 256;
@@ -573,11 +577,11 @@ void JaguarBase::MotionSensorDriver::DealWithPacket(const unsigned char *lpComDa
                 }
               }
 
-              pthread_mutex_unlock(&_mutex_Data_Buf);
+              pthread_mutex_unlock(_mutex_Data_Buf);
               debugCommMessage("receive custom sensor data packet!\n");
               break;
             case COMTYPE_STANDARD_SENSOR:
-              pthread_mutex_lock(&_mutex_Data_Buf);
+              pthread_mutex_lock(_mutex_Data_Buf);
               for (int i = 0; i < ULTRASONICSENSOR_NUM; i ++)
               {
                 _rangeSensorData.usRangeSensor[i] = lpComData[INDEX_DATA + i];
@@ -605,7 +609,7 @@ void JaguarBase::MotionSensorDriver::DealWithPacket(const unsigned char *lpComDa
                 _rangeSensorData.irRangeSensor[9] = _standardSensorData.tiltingSensorData[1];
               }
 
-              pthread_mutex_unlock(&_mutex_Data_Buf);
+              pthread_mutex_unlock(_mutex_Data_Buf);
               debugCommMessage("receive standard sensor data packet!\n");
               break;
             default:
@@ -774,16 +778,16 @@ void JaguarBase::MotionSensorDriver:: setMotionDriverConfig(MotionConfig* driver
 
 int JaguarBase::MotionSensorDriver::readMotorSensorData(MotorSensorData* motorSensorData)
 {
-  pthread_mutex_lock(&_mutex_Data_Buf);
+  pthread_mutex_lock(_mutex_Data_Buf);
   memcpy(motorSensorData,&_motorSensorData,sizeof(MotorSensorData));
-  pthread_mutex_unlock(&_mutex_Data_Buf);
+  pthread_mutex_unlock(_mutex_Data_Buf);
   return 0;
 }
 int JaguarBase::MotionSensorDriver:: readPowerSensorData(PowerSensorData* powerSensorData)
 {
-  pthread_mutex_lock(&_mutex_Data_Buf);
+  pthread_mutex_lock(_mutex_Data_Buf);
   memcpy(powerSensorData,&_powerSensorData,sizeof(PowerSensorData));
-  pthread_mutex_unlock(&_mutex_Data_Buf);
+  pthread_mutex_unlock(_mutex_Data_Buf);
   return 0;
 }
 
@@ -791,25 +795,25 @@ int JaguarBase::MotionSensorDriver:: readPowerSensorData(PowerSensorData* powerS
 int JaguarBase::MotionSensorDriver:: readCustomSensorData(CustomSensorData* customSensorData)
 {
 
-  pthread_mutex_lock(&_mutex_Data_Buf);
+  pthread_mutex_lock(_mutex_Data_Buf);
   memcpy(customSensorData, &_customSensorData, sizeof(CustomSensorData));
-  pthread_mutex_unlock(&_mutex_Data_Buf);
+  pthread_mutex_unlock(_mutex_Data_Buf);
   return 0;
  }
 
 int JaguarBase::MotionSensorDriver:: readRangeSensorData(RangeSensorData* rangeSensorData)
 {
-  pthread_mutex_lock(&_mutex_Data_Buf);
+  pthread_mutex_lock(_mutex_Data_Buf);
   memcpy(rangeSensorData, &_rangeSensorData, sizeof(RangeSensorData));
-  pthread_mutex_unlock(&_mutex_Data_Buf);
+  pthread_mutex_unlock(_mutex_Data_Buf);
   return 0;
 }
 
 int JaguarBase::MotionSensorDriver:: readStandardSensorData(StandardSensorData* standardSensorData)
 {
-  pthread_mutex_lock(&_mutex_Data_Buf);
+  pthread_mutex_lock(_mutex_Data_Buf);
   memcpy(standardSensorData,&_standardSensorData,sizeof(StandardSensorData));
-  pthread_mutex_unlock(&_mutex_Data_Buf);
+  pthread_mutex_unlock(_mutex_Data_Buf);
   return 0;
 }
 

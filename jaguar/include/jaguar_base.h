@@ -535,7 +535,7 @@ namespace JaguarBase
     struct timeval _tv;
     fd_set _readfds;
     int _comCnt;
-    pthread_mutex_t _mutex_Data_Buf;
+    pthread_mutex_t *_mutex_Data_Buf;
     MotionConfig *_robotConfig;
     boost::shared_ptr<boost::thread> _pCommThread;
 

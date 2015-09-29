@@ -95,8 +95,8 @@ private:
 
 //Map the default axes to joystick axes 1,2,3
 JoystickTeleopMode::JoystickTeleopMode():
-  linear_(3),
-  angular_(2),
+  linear_(4),
+  angular_(3),
   flipper_f(1),
   flipper_r(0)
 {
