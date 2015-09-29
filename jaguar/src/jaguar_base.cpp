@@ -100,7 +100,7 @@ void JaguarBase::MotionSensorDriver::close()
 }
 
 
-int JaguarBase::MotionSensorDriver::openSerial(const char* serialPort, const long BAUD)
+int JaguarBase::MotionSensorDriver::openSerial(const char* serialPort, const long baudRate)
 {
 
   if (portOpen())
@@ -118,13 +118,16 @@ int JaguarBase::MotionSensorDriver::openSerial(const char* serialPort, const lon
 
     tcgetattr(_serialfd, &newtio);
     memset(&newtio.c_cc, 0,sizeof(newtio.c_cc));
-    newtio.c_cflag = BAUD|CS8|CLOCAL|CREAD;
+    newtio.c_cflag = CS8|CLOCAL|CREAD;
     newtio.c_iflag = IGNPAR;
     newtio.c_oflag = 0;
     newtio.c_lflag = 0;
     newtio.c_cc[VMIN] = 0;              //VMIN = 0, VTIME = 0, read will return immediately
     newtio.c_cc[VTIME] = 0;
     tcflush(_serialfd,TCIFLUSH);
+    cfsetispeed(&newtio, B115200);
+    cfsetospeed(&newtio, B115200);
+    
     tcsetattr(_serialfd,TCSANOW, &newtio);
 
     printf("listener: waiting for robot server, starting receiving...\n");
