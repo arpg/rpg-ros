@@ -32,6 +32,8 @@ def usage():
         print "                   - husky_msgs/HuskyWheelTick "
         print "                   - ar_track_alvar_msgs/AlvarMarkers"
         print "                   - nav_msgs/Odometry"
+        print "                   - geometry_msgs/TransformStamped"
+        print "                   - geometry_msgs/Vector3Stamped"
  	print ""
  	print "  Rosbag Extraction Script v1 - Shane Lynn - 7th May 2012"
         print "  Updated 6/19 - Steve McGuire, to include add'l message and for OpenCV2"
@@ -41,7 +43,7 @@ def usage():
 
 allowedTopics = ['sensor_msgs/Image', 'sensor_msgs/Imu', 'sensor_msgs/LaserScan', 'sensor_msgs/NavSatFix', \
 			'gps_common/GPSFix', 'umrr_driver/radar_msg', 'husky_msgs/HuskyWheelTick', \
-                 'ar_track_alvar_msgs/AlvarMarkers', 'sensor_msgs/JointState', 'nav_msgs/Odometry', 'geometry_msgs/TransformStamped']	
+                 'ar_track_alvar_msgs/AlvarMarkers', 'sensor_msgs/JointState', 'nav_msgs/Odometry', 'geometry_msgs/TransformStamped','geometry_msgs/Vector3Stamped']	
 
 def main():
 	rospy.loginfo("Processing input arguments:")

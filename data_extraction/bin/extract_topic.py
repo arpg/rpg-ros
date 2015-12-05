@@ -37,6 +37,7 @@ def usage():
         print "                   - husky_msgs/HuskyWheelTick "
         print "                   - ar_track_alvar_msgs/AlvarMarkers"
         print "                   - nav_msgs/Odometry"
+        print "                   - geometry_msgs/Vector3Stamped"
  	print ""
  	print "  Rosbag Extraction Script v1 - Shane Lynn - 3rd May 2012"
         print "  Updated 6/19/2015 - Steve McGuire, to include add'l message and for OpenCV2"
@@ -57,7 +58,7 @@ def getHeader(msg):
 	#Add handlers as necessary for each message type:
 	
 	if (msgType == '_sensor_msgs__LaserScan'): 		
-		headerRow = ["Time", "Header_sequence", "Header_secs", "Header_nsecs", \
+		headerRow = ["%Time", "Header_sequence", "Header_secs", "Header_nsecs", \
 						 "angle_min", "angle_max", "angle_increment","time_increment", "scan_time", "range_min", "range_max" ]
 		#set up the header row:
 		for i in range(len(msg.ranges)):
@@ -67,47 +68,50 @@ def getHeader(msg):
 				headerRow.append("Intensity%s"%(i+1))
 				
 	elif (msgType == '_sensor_msgs__Imu'):
-		headerRow = ["Time", "Header_sequence", "Header_secs", "Header_nsecs", \
+		headerRow = ["%Time", "Header_sequence", "Header_secs", "Header_nsecs", \
 		                 "Orientation_x", "Orientation_y", "Orientation_z", "Orientation_w", \
 		                 "AngularVelocity_x", "AngularVelocity_y", "AngularVelocity_z", \
 		                 "LinearAcceleration_x", "LinearAcceleration_y", "LinearAcceleration_z"]
-	elif (msgType == '_geometry_msgs__PoseStamped'):
-		headerRow = ["Time", "Header_sequence", "Header_secs", "Header_nsecs", \
-		                 "Pose_x", "Pose_y", "Pose_z", "Orientation_x", \
-		                 "Orientation_y", "Orientation_z", "Orientation_w"]
+	elif (msgType == '_geometry_msgs__Vector3Stamped'):
+		headerRow = ["%Time", "Header_sequence", "Header_secs", "Header_nsecs", \
+		             "X", "Y", "Z"]
+        elif (msgType == '_geometry_msgs__PoseStamped'):
+		headerRow = ["%Time", "Header_sequence", "Header_secs", "Header_nsecs", \
+		             "Pose_x", "Pose_y", "Pose_z", "Orientation_x", \
+		             "Orientation_y", "Orientation_z", "Orientation_w"]
         elif (msgType == '_geometry_msgs__TransformStamped'):
-		headerRow = ["Time", "Header_sequence", "Header_secs", "Header_nsecs", \
+		headerRow = ["%Time", "Header_sequence", "Header_secs", "Header_nsecs", \
 		                 "Pose_x", "Pose_y", "Pose_z", "Orientation_x", \
 		                 "Orientation_y", "Orientation_z", "Orientation_w"]        
 	elif (msgType == '_nav_msgs__Odometry'):
-		headerRow = ["Time", "Header_sequence", "Header_secs", "Header_nsecs", \
+		headerRow = ["%Time", "Header_sequence", "Header_secs", "Header_nsecs", \
 		                 "Pose_x", "Pose_y", "Pose_z", "Orientation_x", \
 		                 "Orientation_y", "Orientation_z", "Orientation_w"]
 	elif (msgType == '_sensor_msgs__NavSatFix'):
-		headerRow = ["Time", "Header_sequence", "Header_secs", "Header_nsecs", \
+		headerRow = ["%Time", "Header_sequence", "Header_secs", "Header_nsecs", \
 		                 "Latitude", "Longitude", "Altitude", "PositionCovariance"]
 		
 	elif (msgType == '_gps_common__GPSFix'):
-		headerRow =["Time", "Header_sequence", "Header_secs", "Header_nsecs", "GPS_status", \
+		headerRow =["%Time", "Header_sequence", "Header_secs", "Header_nsecs", "GPS_status", \
 		                 "Latitude", "Longitude", "Altitude", "PositionCovariance", "PositionCovariance_type", \
 		                 "Track", "Speed", "Vert_Speed", "GPS_time", "Pitch", "Roll", "Dip" \
 		                 ]
 	elif (msgType == '_sensor_msgs__Image'):
-		headerRow = ["Time", "Header_ sequence", "Header_secs", "Header_nsecs", "Filename"]
+		headerRow = ["%Time", "Header_ sequence", "Header_secs", "Header_nsecs", "Filename"]
 		isImage = True
 		
 	elif (msgType == '_umrr_driver__radar_msg'):
-		headerRow = ["Time", "Header_sequence", "Header_secs", "Header_nsecs", \
+		headerRow = ["%Time", "Header_sequence", "Header_secs", "Header_nsecs", \
 					"SensorID", "NumTargets", "Mode", "Submode", "Status", \
 					"Target_Range", "Target_Angle", "Target_RadialSpeed", "Target_Signal2Threshold", "Target_Type"]
 	elif (msgType == '_husky_msgs__HuskyWheelTick'):
-		headerRow = ["Time", "Header_sequence", "Header_secs", "Header_nsecs", \
+		headerRow = ["%Time", "Header_sequence", "Header_secs", "Header_nsecs", \
 					"Channel0", "Channel1"]
         elif (msgType == '_ar_track_alvar_msgs__AlvarMarkers'):
-		headerRow = ["Time", "Header_sequence", "Header_secs", "Header_nsecs", \
+		headerRow = ["%Time", "Header_sequence", "Header_secs", "Header_nsecs", \
 					"MarkerID", "Pose_x", "Pose_y", "Pose_z"]	       
 	elif (msgType == '_sensor_msgs__JointState'):
-		headerRow = ["Time", "Header_sequence", "Header_secs", "Header_nsecs"]
+		headerRow = ["%Time", "Header_sequence", "Header_secs", "Header_nsecs"]
 		for i in range(len(msg.name)):
 			headerRow.append("%s_Pos"%(msg.name[i]))
                         headerRow.append("%s_Vel"%(msg.name[i]))
@@ -146,6 +150,10 @@ def getColumns(t, msg, fileWriter):
 		                     msg.angular_velocity.x, msg.angular_velocity.y, msg.angular_velocity.z, \
 		                     msg.linear_acceleration.x, msg.linear_acceleration.y, msg.linear_acceleration.z]
                 fileWriter.writerow(columns)
+        elif (msgType == '_geometry_msgs__Vector3Stamped'):
+		columns = [t, msg.header.seq, msg.header.stamp.secs, msg.header.stamp.nsecs, \
+                           msg.vector.x, msg.vector.y, msg.vector.z]
+		fileWriter.writerow(columns)
         elif (msgType == '_geometry_msgs__PoseStamped'):
 		columns = [t, msg.header.seq, msg.header.stamp.secs, msg.header.stamp.nsecs, \
                            msg.pose.x, msg.pose.y, msg.pose.z, \
