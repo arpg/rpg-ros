@@ -156,8 +156,9 @@ def getColumns(t, msg, fileWriter):
 		fileWriter.writerow(columns)
         elif (msgType == '_geometry_msgs__PoseStamped'):
 		columns = [t, msg.header.seq, msg.header.stamp.secs, msg.header.stamp.nsecs, \
-                           msg.pose.x, msg.pose.y, msg.pose.z, \
-                           msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w]
+                           msg.pose.position.x, msg.pose.position.y, msg.pose.position.z, \
+                           msg.pose.orientation.x, msg.pose.orientation.y, msg.pose.orientation.z, \
+                           msg.pose.orientation.w]
 		fileWriter.writerow(columns)
         elif (msgType == '_geometry_msgs__TransformStamped'):
 		columns = [t, msg.header.seq, msg.header.stamp.secs, msg.header.stamp.nsecs, \

@@ -34,6 +34,7 @@ def usage():
         print "                   - nav_msgs/Odometry"
         print "                   - geometry_msgs/TransformStamped"
         print "                   - geometry_msgs/Vector3Stamped"
+        print "                   - geometry_msgs/PoseStamped"
  	print ""
  	print "  Rosbag Extraction Script v1 - Shane Lynn - 7th May 2012"
         print "  Updated 6/19 - Steve McGuire, to include add'l message and for OpenCV2"
@@ -43,9 +44,11 @@ def usage():
 
 allowedTopics = ['sensor_msgs/Image', 'sensor_msgs/Imu', 'sensor_msgs/LaserScan', 'sensor_msgs/NavSatFix', \
 			'gps_common/GPSFix', 'umrr_driver/radar_msg', 'husky_msgs/HuskyWheelTick', \
-                 'ar_track_alvar_msgs/AlvarMarkers', 'sensor_msgs/JointState', 'nav_msgs/Odometry', 'geometry_msgs/TransformStamped','geometry_msgs/Vector3Stamped']	
+                 'ar_track_alvar_msgs/AlvarMarkers', 'sensor_msgs/JointState', 'nav_msgs/Odometry', \
+                 'geometry_msgs/TransformStamped','geometry_msgs/Vector3Stamped', 'geometry_msgs/PoseStamped']	
 
 def main():
+        #rospy.init_node('data_extraction', anonymous=True, log_level=rospy.INFO)
 	rospy.loginfo("Processing input arguments:")
 	try:
 		opts, extraparams = getopt.getopt(sys.argv[1:], "o:b:t:") #start at the second argument.
