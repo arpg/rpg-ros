@@ -137,10 +137,12 @@ void RobustMatcher::robustMatchFromPrior(std::vector<cv::DMatch>& good_matches,
 
   // 3. Remove matches for which NN ratio is > than threshold
   // clean image 1 -> image 2 matches
-  ratioTest(matches12);
+  int removed;
+  removed = ratioTest(matches12);
+  //printf("Pruned %d matches, phase 1\n", removed);
   // clean image 2 -> image 1 matches
-  ratioTest(matches21);
-
+  removed = ratioTest(matches21);
+  //printf("Pruned %d matches, phase 2\n", removed);
   // 4. Remove non-symmetrical matches
   symmetryTest(matches12, matches21, good_matches);
 }

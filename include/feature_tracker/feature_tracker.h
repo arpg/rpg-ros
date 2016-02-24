@@ -24,4 +24,20 @@ typedef struct FrameInfo
   std::vector<cv::DMatch> matches;
 }
 frameinfo_t;
+
+typedef struct ArcInfo
+{
+  uint32_t id; //monotonic increasing ID, assigned on first match
+  uint32_t firstSeen; //seq of first appearance
+  std::vector<cv::KeyPoint> points;
+  std::vector<int> matchIDs; //matches, starting from first matched frame. Used to correlate between frames
+  bool active;
+  bool touched;
+  ArcInfo()
+  {
+    active = false;
+    touched = false;
+  }
+}
+  arcinfo_t;
 #endif

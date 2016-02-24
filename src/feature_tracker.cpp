@@ -51,7 +51,10 @@ private:
   cv::Ptr<cv::flann::SearchParams> searchParams;
 
   std::vector<std::shared_ptr<FrameInfo>> frames;
-
+  std::vector<std::shared_ptr<ArcInfo>> arcs;
+  
+  float euclideanDist(const cv::Point& p, const cv::Point& q);
+  int arcID;
 };
 
 }
@@ -63,7 +66,7 @@ FeatureTracker::FeatureTracker() :
   it(n_)
 {
 
-  image_sub = it.subscribe("/image", 1, &FeatureTracker::process, this);
+  image_sub = it.subscribe("image", 1, &FeatureTracker::process, this);
 
   ros::NodeHandle local_ns_("~");
 
@@ -86,14 +89,20 @@ FeatureTracker::FeatureTracker() :
   matcher = cv::makePtr<cv::FlannBasedMatcher>(indexParams, searchParams);
   rmatcher.setDescriptorMatcher(matcher);                                                         // set matcher
   rmatcher.setRatio(ratioTest); // set ratio test parameter
-  
+
+  arcID = 0;
+}
+
+float FeatureTracker::euclideanDist(const cv::Point& p, const cv::Point& q) {
+  cv::Point diff = p - q;
+    return cv::sqrt(diff.x*diff.x + diff.y*diff.y);
 }
 
 void FeatureTracker::process(const sensor_msgs::ImageConstPtr& msg)
 {
   cv_bridge::CvImagePtr src_ptr;
   cv_bridge::CvImagePtr dest_ptr(new cv_bridge::CvImage);
-
+  
   
   try {
     //Find the color blob, use as a mask over the source color image for the result
@@ -107,14 +116,63 @@ void FeatureTracker::process(const sensor_msgs::ImageConstPtr& msg)
     newFrame->seq = msg->header.seq;
     
     //Compute the descriptors to match for the next frame
+    rmatcher.computeKeyPoints(src_ptr->image, newFrame->keypoints);
     rmatcher.computeDescriptors(src_ptr->image, newFrame->keypoints, newFrame->descriptors);
 
+    //ROS_INFO("Found %d keypoints", newFrame->keypoints.size());
     //If there is a past frame, try to match against its descriptors
-    shared_ptr<FrameInfo> lastFrame = frames.back();
-    if (lastFrame != NULL)
+  
+    if (frames.size() != 0  )
       {
+	shared_ptr<FrameInfo> lastFrame = frames.back();
 	//Compute a list of matches from t-1 to t, stored in t
 	rmatcher.robustMatchFromPrior(newFrame->matches, newFrame->descriptors, lastFrame->descriptors);
+	//ROS_INFO("Found %d matches", newFrame->matches.size());
+
+	//Update the arc info
+	//go through the list of active arcs and mark all of them as untouched
+	for (shared_ptr<ArcInfo> thisArc : arcs)
+	  {
+	    thisArc->touched  = false;
+	  }
+	
+	for (cv::DMatch thisMatch : newFrame->matches)
+	  {
+	    //go through the list of active arcs and touch those that are referenced
+	    int foundExisting = false;
+	    for (shared_ptr<ArcInfo> thisArc : arcs)
+	      {
+		if (thisArc->active && (thisArc->matchIDs.back() == thisMatch.trainIdx))
+		  {
+		    thisArc->touched = true;
+		    foundExisting = true;
+		    thisArc->points.push_back(newFrame->keypoints[thisMatch.queryIdx]);
+		    thisArc->matchIDs.push_back(thisMatch.queryIdx);
+		  }
+
+		if (!foundExisting)
+		  {
+		    // Add a new arc to look for
+		    shared_ptr<ArcInfo> newArc = make_shared<ArcInfo>();
+		    newArc->id = arcID++;
+		    newArc->touched = true;
+		    newArc->points.push_back(newFrame->keypoints[thisMatch.queryIdx]);
+		    newArc->matchIDs.push_back(thisMatch.queryIdx);
+		  }
+		
+	      }
+	  }
+
+	//Any arc that wasn't touched in this round is now inactive
+	//go through the list of active arcs and mark all of them as untouched
+	for (shared_ptr<ArcInfo> thisArc : arcs)
+	  {
+	    if (!thisArc->touched)
+	      {
+		thisArc->active = false;
+	      }
+	  }
+	
       }
     //Add to stored frame list
     frames.push_back(newFrame);
@@ -122,12 +180,29 @@ void FeatureTracker::process(const sensor_msgs::ImageConstPtr& msg)
     //prepare the display
     dest_ptr->image = src_ptr->image.clone();
 
-    /*
-    for (int i=0; i<newFrame->keypoints.size(); i++)
+    //Draw all of the tracks
+    for (int i=0; i<frames.size(); i++)
       {
-	cv::circle(dest_ptr->image, newFrame->keypoints[i].pt, 4, cv::Scalar(254,0,0), -1, 8);
+	shared_ptr<FrameInfo> thisFrame = frames[i];
+	if (thisFrame->matches.size() > 0)
+	  {
+	    for (cv::DMatch thisMatch : thisFrame->matches)
+	      {
+		//ROS_INFO("Drawing match at [%f,%f]", thisFrame->keypoints[thisMatch.queryIdx].pt.x,
+		//	 thisFrame->keypoints[thisMatch.queryIdx].pt.y);
+		//cv::circle(dest_ptr->image, thisFrame->keypoints[thisMatch.queryIdx].pt, 1, cv::Scalar(254,0,0), -1, 8);
+		//ROS_INFO("Match distance: %f", thisMatch.distance);
+		if (euclideanDist(frames[i-1]->keypoints[thisMatch.trainIdx].pt,
+			     thisFrame->keypoints[thisMatch.queryIdx].pt) < 5)
+		  {
+		    cv::line(dest_ptr->image, frames[i-1]->keypoints[thisMatch.trainIdx].pt,
+			     thisFrame->keypoints[thisMatch.queryIdx].pt, CV_RGB(254,0,0));
+		  }
+	      }
+	  }
+
       }
-    */
+
     
     if(display_)
       {
