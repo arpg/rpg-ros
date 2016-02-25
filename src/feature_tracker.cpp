@@ -54,7 +54,14 @@ private:
   std::vector<std::shared_ptr<ArcInfo>> arcs;
   
   float euclideanDist(const cv::Point& p, const cv::Point& q);
+  bool serviceCallback(feature_tracker::GetArcs::Request &req, feature_tracker::GetArcs::Response &res);
+  bool clearArcsCallback(feature_tracker::ClearArcs::Request &req, feature_tracker::ClearArcs::Response &res);
+  ros::ServiceServer arcService;
+  ros::ServiceServer clearService;
   int arcID;
+  uint16_t imageWidth;
+  uint16_t imageHeight;
+  
 };
 
 }
@@ -91,6 +98,10 @@ FeatureTracker::FeatureTracker() :
   rmatcher.setRatio(ratioTest); // set ratio test parameter
 
   arcID = 0;
+
+  //Advertise the service
+  arcService = n_.advertiseService("GetArcs", &FeatureTracker::serviceCallback, this);
+  clearService = n_.advertiseService("ClearArcs", &FeatureTracker::clearArcsCallback, this);
 }
 
 float FeatureTracker::euclideanDist(const cv::Point& p, const cv::Point& q) {
@@ -102,7 +113,8 @@ void FeatureTracker::process(const sensor_msgs::ImageConstPtr& msg)
 {
   cv_bridge::CvImagePtr src_ptr;
   cv_bridge::CvImagePtr dest_ptr(new cv_bridge::CvImage);
-  
+  imageHeight = msg->height;
+  imageWidth = msg->width;
   
   try {
     //Find the color blob, use as a mask over the source color image for the result
@@ -129,6 +141,7 @@ void FeatureTracker::process(const sensor_msgs::ImageConstPtr& msg)
 	rmatcher.robustMatchFromPrior(newFrame->matches, newFrame->descriptors, lastFrame->descriptors);
 	//ROS_INFO("Found %d matches", newFrame->matches.size());
 
+	//ROS_INFO("Number of active arcs: %d", arcs.size());
 	//Update the arc info
 	//go through the list of active arcs and mark all of them as untouched
 	for (shared_ptr<ArcInfo> thisArc : arcs)
@@ -140,68 +153,93 @@ void FeatureTracker::process(const sensor_msgs::ImageConstPtr& msg)
 	  {
 	    //go through the list of active arcs and touch those that are referenced
 	    int foundExisting = false;
+	    ROS_INFO("Looking for trainingIdx: %d", thisMatch.trainIdx);
+	    
 	    for (shared_ptr<ArcInfo> thisArc : arcs)
 	      {
+		//ROS_INFO("Processing arcID: %d", thisArc->id);
+		//ROS_INFO("Its last index was: %d", thisArc->matchIDs.back());
+		//Compare the training (old) against the query (new)
 		if (thisArc->active && (thisArc->matchIDs.back() == thisMatch.trainIdx))
-		  {
-		    thisArc->touched = true;
-		    foundExisting = true;
-		    thisArc->points.push_back(newFrame->keypoints[thisMatch.queryIdx]);
-		    thisArc->matchIDs.push_back(thisMatch.queryIdx);
-		  }
-
-		if (!foundExisting)
-		  {
-		    // Add a new arc to look for
-		    shared_ptr<ArcInfo> newArc = make_shared<ArcInfo>();
-		    newArc->id = arcID++;
-		    newArc->touched = true;
-		    newArc->points.push_back(newFrame->keypoints[thisMatch.queryIdx]);
-		    newArc->matchIDs.push_back(thisMatch.queryIdx);
-		  }
 		
+		  {
+		    //Check the distance between the points - make sure it moved somewhat
+		    if (euclideanDist(newFrame->keypoints[thisMatch.queryIdx].pt,
+					  lastFrame->keypoints[thisMatch.trainIdx].pt) > 2)
+		      {
+			ROS_INFO("Adding point to arc %d", thisArc->id);
+			thisArc->touched = true;
+			foundExisting = true;
+			thisArc->points.push_back(newFrame->keypoints[thisMatch.queryIdx]);
+			thisArc->matchIDs.push_back(thisMatch.queryIdx); //so we can match against it
+			//during the next round
+			continue; //since it can't match any others
+		      }
+		  }
 	      }
-	  }
-
-	//Any arc that wasn't touched in this round is now inactive
-	//go through the list of active arcs and mark all of them as untouched
-	for (shared_ptr<ArcInfo> thisArc : arcs)
-	  {
-	    if (!thisArc->touched)
+	    
+	    if (!foundExisting)
 	      {
-		thisArc->active = false;
+		// Add a new arc to look for
+		shared_ptr<ArcInfo> newArc = make_shared<ArcInfo>();
+		newArc->id = arcID++;
+		newArc->touched = true;
+		newArc->active = true;
+		newArc->points.push_back(newFrame->keypoints[thisMatch.queryIdx]);
+		newArc->matchIDs.push_back(thisMatch.queryIdx);
+		//ROS_INFO("Added arcID: %d", newArc->id);
+		arcs.push_back(newArc);
 	      }
 	  }
 	
+	//Any arc that wasn't touched in this round is now inactive
+	//go through the list of active arcs and mark all of them as untouched
+	for (vector<shared_ptr<ArcInfo>>::iterator it = arcs.begin(); it != arcs.end();)
+	  {
+	    shared_ptr<ArcInfo> thisArc = *it;
+	    if (!thisArc->touched)
+	      {
+		thisArc->active = false;
+		//Only save inactive arcs where the length is > 3 frames 
+		if (thisArc->points.size() < 3)
+		  {
+		    //Remove from the list
+		    arcs.erase(it);
+		  }
+		else
+		  it++;
+	      }
+	    else
+	      it++;	    
+	  }
+	
       }
+ 
     //Add to stored frame list
     frames.push_back(newFrame);
     
     //prepare the display
     dest_ptr->image = src_ptr->image.clone();
-
-    //Draw all of the tracks
-    for (int i=0; i<frames.size(); i++)
+    cv::RNG rng(12345);
+    //Draw all of the arcs
+    int arcsDrawn = 0;
+    for (shared_ptr<ArcInfo> thisArc : arcs)
       {
-	shared_ptr<FrameInfo> thisFrame = frames[i];
-	if (thisFrame->matches.size() > 0)
+	if (thisArc->points.size() < 8)
+	  continue;
+	//if (arcsDrawn > 20)
+	//  break;
+	//Only draw the longest of arcs
+	cv::Scalar arcColor = cv::Scalar(0, 0, rng.uniform(0,255));
+	for (cv::KeyPoint thisPoint : thisArc->points)
 	  {
-	    for (cv::DMatch thisMatch : thisFrame->matches)
-	      {
-		//ROS_INFO("Drawing match at [%f,%f]", thisFrame->keypoints[thisMatch.queryIdx].pt.x,
-		//	 thisFrame->keypoints[thisMatch.queryIdx].pt.y);
-		//cv::circle(dest_ptr->image, thisFrame->keypoints[thisMatch.queryIdx].pt, 1, cv::Scalar(254,0,0), -1, 8);
-		//ROS_INFO("Match distance: %f", thisMatch.distance);
-		if (euclideanDist(frames[i-1]->keypoints[thisMatch.trainIdx].pt,
-			     thisFrame->keypoints[thisMatch.queryIdx].pt) < 5)
-		  {
-		    cv::line(dest_ptr->image, frames[i-1]->keypoints[thisMatch.trainIdx].pt,
-			     thisFrame->keypoints[thisMatch.queryIdx].pt, CV_RGB(254,0,0));
-		  }
-	      }
+	    cv::circle(dest_ptr->image, thisPoint.pt, 1, arcColor, -1, 8); 
 	  }
-
+	arcsDrawn++;
+	ROS_INFO("Arc length (frames): %d", thisArc->points.size());
       }
+    
+
 
     
     if(display_)
@@ -223,6 +261,33 @@ void FeatureTracker::process(const sensor_msgs::ImageConstPtr& msg)
     ROS_ERROR("cv_bridge exception: %s", e.what());
   }
 }
+bool FeatureTracker::serviceCallback(feature_tracker::GetArcs::Request &req, feature_tracker::GetArcs::Response &res)
+{
+  res.imageWidth = imageWidth;
+  res.imageHeight = imageHeight;
+  
+  //Process the arc list and return a set of ordered points
+  for (shared_ptr<ArcInfo> thisArc : arcs)
+    {
+      if (thisArc->points.size() < req.minSize)
+	continue;
+      Arc newArc;
+      newArc.id = thisArc->id;
+      for (cv::KeyPoint thisPoint : thisArc->points)
+	{
+	  newArc.x.push_back(thisPoint.pt.x);
+	  newArc.y.push_back(thisPoint.pt.y);
+	}
+      res.arcs.push_back(newArc);
+    }
+  return true;
+}
+
+bool FeatureTracker::clearArcsCallback(feature_tracker::ClearArcs::Request &req, feature_tracker::ClearArcs::Response &res)
+{
+  arcs.clear();
+  return true;
+}
 
 int main(int argc, char** argv)
 {
@@ -231,7 +296,11 @@ int main(int argc, char** argv)
   //ROS_INFO("Starting feature_tracker");
   FeatureTracker seg;
 
+  while (ros::ok())
+    {
+        ros::spinOnce();
+	cv::waitKey(1);
+    }
 
-  ros::spin();
   return 0;
 }

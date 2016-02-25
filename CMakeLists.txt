@@ -62,16 +62,17 @@ endif()
 ##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
 
 ## Generate messages in the 'msg' folder
-# add_message_files(
-#   FILES
-#   
-# )
+ add_message_files(
+   FILES
+   Arc.msg   
+ )
 
 ## Generate services in the 'srv' folder
-# add_service_files(
-#   FILES
-#
-# )
+ add_service_files(
+   FILES
+   GetArcs.srv
+   ClearArcs.srv
+ )
 
 ## Generate actions in the 'action' folder
 # add_action_files(
@@ -125,17 +126,20 @@ include_directories(
 ## Declare a cpp executable
 
 add_executable(feature_tracker src/feature_tracker.cpp src/RobustMatcher.cpp)
+add_executable(get_arcs src/getArcs.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
 
 add_dependencies(feature_tracker ${PROJECT_NAME}_generate_messages_cpp ${catkin_EXPORTED_TARGETS})
+add_dependencies(get_arcs ${PROJECT_NAME}_generate_messages_cpp ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
 				   
 target_link_libraries(feature_tracker ${OpenCV_LIBRARIES}
 				      ${catkin_LIBRARIES})
-
+target_link_libraries(get_arcs ${OpenCV_LIBRARIES}
+				      ${catkin_LIBRARIES})
 #############
 ## Install ##
 #############

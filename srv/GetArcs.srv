@@ -1,0 +1,7 @@
+#request
+uint16 minSize
+---
+#response
+Arc[] arcs
+uint16 imageWidth
+uint16 imageHeight

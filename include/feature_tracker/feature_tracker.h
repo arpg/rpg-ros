@@ -13,7 +13,8 @@
 #include <opencv2/calib3d/calib3d.hpp>
 #include <image_transport/image_transport.h>
 #include <feature_tracker/RobustMatcher.h>
-
+#include <feature_tracker/GetArcs.h>
+#include <feature_tracker/ClearArcs.h>
 //
 
 typedef struct FrameInfo
