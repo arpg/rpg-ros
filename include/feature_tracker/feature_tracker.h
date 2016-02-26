@@ -11,6 +11,8 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/calib3d/calib3d.hpp>
+#include <opencv2/video/tracking.hpp>
+
 #include <image_transport/image_transport.h>
 #include <feature_tracker/RobustMatcher.h>
 #include <feature_tracker/GetArcs.h>
@@ -30,8 +32,8 @@ typedef struct ArcInfo
 {
   uint32_t id; //monotonic increasing ID, assigned on first match
   uint32_t firstSeen; //seq of first appearance
-  std::vector<cv::KeyPoint> points;
-  std::vector<int> matchIDs; //matches, starting from first matched frame. Used to correlate between frames
+  std::vector<cv::Point2f> points;
+  
   bool active;
   bool touched;
   ArcInfo()

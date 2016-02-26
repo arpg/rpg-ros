@@ -21,13 +21,14 @@ void drawArcs(std::vector<feature_tracker::Arc> &arcs, uint16_t width, uint16_t 
 	  cv::line(outImage, cv::Point(thisArc.x[i-1], thisArc.y[i-1]),
 		   cv::Point(thisArc.x[i], thisArc.y[i]),
 		   thisColor);
-		   
+	   
 	  //outImage.at(thisArc.x[i], thisArc.y[i]) = cv::Scalar(255,0,0);
 	}
 
     }
   cv::imshow("Arcs", outImage);
   cv::waitKey(0);
+  cv::imwrite("output.jpg", outImage);
 }
 
 int main(int argc, char **argv)
