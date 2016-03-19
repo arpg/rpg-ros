@@ -15,14 +15,16 @@ and reuses modules as needed
 
 
  */
-#include <ros/ros.h>
 
 #include <feature_tracker/feature_tracker.h>
+
 /*
 
 Code from :
 http://www.learnopencv.com/blob-detection-using-opencv-python-c/
 http://opencv-srf.blogspot.com/2010/09/object-detection-using-color-seperation.html
+rpg_svo's KLT initializer 
+
  */
 
 using namespace std;
@@ -34,7 +36,7 @@ class FeatureTracker
 {
 public:
   FeatureTracker();
-
+  ~FeatureTracker();
   void process(const sensor_msgs::ImageConstPtr& msg);
 private:
   ros::Publisher image_pub_;
@@ -57,7 +59,8 @@ private:
 
   std::vector<std::shared_ptr<FrameInfo>> frames;
   std::vector<std::shared_ptr<ArcInfo>> arcs;
-  
+  void pruneKeypoints(vector<cv::KeyPoint> keyPoints, vector<cv::Point2f> &points);
+  void getFeatures( cv::Mat &src, vector<cv::Point2f> &trackedPoints);
   float euclideanDist(const cv::Point& p, const cv::Point& q);
   bool serviceCallback(feature_tracker::GetArcs::Request &req, feature_tracker::GetArcs::Response &res);
   bool clearArcsCallback(feature_tracker::ClearArcs::Request &req, feature_tracker::ClearArcs::Response &res);
@@ -67,13 +70,21 @@ private:
   uint16_t imageWidth;
   uint16_t imageHeight;
   const uint16_t MAX_TRACKS=100;
-  const uint16_t MIN_TRACKS=75; 
+  const uint16_t MIN_TRACKS=75;
+  mutex queueLock;
+  thread *serviceThread;
+  queue<boost::shared_ptr<const sensor_msgs::Image>> imageQueue;
+  void service();
+  void processOne(const sensor_msgs::ImageConstPtr& msg);
 };
 
 }
 
 using namespace feature_tracker;
 
+FeatureTracker::~FeatureTracker()
+{
+}
 
 FeatureTracker::FeatureTracker() :
   it(n_)
@@ -110,6 +121,12 @@ FeatureTracker::FeatureTracker() :
   //Advertise the services
   arcService = n_.advertiseService("GetArcs", &FeatureTracker::serviceCallback, this);
   clearService = n_.advertiseService("ClearArcs", &FeatureTracker::clearArcsCallback, this);
+
+  //Service thread
+  serviceThread = new thread(bind(&FeatureTracker::service, this));
+
+  //Annotated publisher
+  image_pub_ = n_.advertise<sensor_msgs::Image>("features", 1);
 }
 
 float FeatureTracker::euclideanDist(const cv::Point& p, const cv::Point& q) {
@@ -117,11 +134,79 @@ float FeatureTracker::euclideanDist(const cv::Point& p, const cv::Point& q) {
     return cv::sqrt(diff.x*diff.x + diff.y*diff.y);
 }
 
+void FeatureTracker::pruneKeypoints(vector<cv::KeyPoint> keyPoints, vector<cv::Point2f> &points)
+{
+  //  if (keyPoints.size() < i = keyPoints.size() - FeatureTracker::MAX_TRACKS
+  int pointsToAdd = 50;
+  for (int i = 0; i < pointsToAdd; i++)
+    {
+      cv::KeyPoint key = keyPoints[i];
+      //printf("Response: %1.2f\n", key.response);
+      points.push_back(key.pt);
+    }
+}
+
 void FeatureTracker::process(const sensor_msgs::ImageConstPtr& msg)
 {
+  queueLock.lock();
+  imageQueue.push(msg);
+  queueLock.unlock();
+}
+
+void FeatureTracker::service()
+{
+  ROS_INFO("FeatureTracker: Started service thread\n");
+  sensor_msgs::ImageConstPtr thisMsg;
+  while (true)
+    {
+      thisMsg = NULL;
+      queueLock.lock();
+      if (imageQueue.size() > 0)
+	{
+	  thisMsg = imageQueue.front();
+	  imageQueue.pop();
+	}
+      else
+	thisMsg = NULL;
+      queueLock.unlock();
+
+      if (thisMsg)
+	{
+	  //ROS_INFO("Processing message");
+	  processOne(thisMsg);
+	  thisMsg = NULL;
+	}
+      else
+	{
+	  //No message to process yet...
+	  usleep(1000);
+	}
+      
+    }
+}
+
+void FeatureTracker::getFeatures( cv::Mat &src, vector<cv::Point2f> &trackedPoints)
+{
+  //cv::goodFeaturesToTrack(src, trackedPoints, FeatureTracker::MAX_TRACKS, 0.2, 7, cv::Mat(), 7, 0, 0.04);
+  //try FAST:
+
+  cv::Size subPixWinSize(10,10);
   cv::TermCriteria termcrit(cv::TermCriteria::COUNT|cv::TermCriteria::EPS,10,0.03);
-  cv::Size subPixWinSize(10,10), winSize(5,5);
+
+    
+  vector<cv::KeyPoint> trackedKeyPoints;
+		
+  cv::Ptr<cv::FeatureDetector> detector = cv::FeatureDetector::create("ORB");
+  detector->detect(src, trackedKeyPoints);
+  pruneKeypoints(trackedKeyPoints, trackedPoints);
   
+  
+  //cv::cornerSubPix(src, trackedPoints, subPixWinSize, cv::Size(-1,-1), termcrit);
+}
+
+void FeatureTracker::processOne(const sensor_msgs::ImageConstPtr& msg)
+{
+
   cv_bridge::CvImagePtr src_ptr;
   cv_bridge::CvImagePtr dest_ptr(new cv_bridge::CvImage);
   imageHeight = msg->height;
@@ -139,8 +224,8 @@ void FeatureTracker::process(const sensor_msgs::ImageConstPtr& msg)
       {
 	// automatic initialization: src + dest are the same thing
 	vector<cv::Point2f> trackedPoints;
-	cv::goodFeaturesToTrack(graySrc, trackedPoints, FeatureTracker::MAX_TRACKS, 0.5, 15, cv::Mat(), 3, 0, 0.04);
-	cv::cornerSubPix(graySrc, trackedPoints, subPixWinSize, cv::Size(-1,-1), termcrit);
+	getFeatures(graySrc, trackedPoints);
+
 	//For this run, there will be this many features (no more)
 	
 	//Save the image as the previous image
@@ -150,7 +235,7 @@ void FeatureTracker::process(const sensor_msgs::ImageConstPtr& msg)
 	for (int i=0; i<trackedPoints.size(); i++)
 	  {
 	    shared_ptr<ArcInfo> newArc = make_shared<ArcInfo>();
-	    //All arcs are now active!
+	    //New arcs are now active!
 	    newArc->active = true;
 	    newArc->id = i;
 	    newArc->points.push_back(trackedPoints[i]);
@@ -197,8 +282,11 @@ void FeatureTracker::process(const sensor_msgs::ImageConstPtr& msg)
 
     
     //We now have a set of features in trackedPoints, and an old image in prevGray, compute the flow into the current image
-    vector<cv::Point2f> newTracks;
-    cv::calcOpticalFlowPyrLK(prevGray, graySrc, pointsToTrack, newTracks, status, err, winSize, 1, termcrit, 0, 0.001);
+    vector<cv::Point2f> newTracks; //cv::OPTFLOW_USE_INITIAL_FLOW
+    cv::TermCriteria termcrit(cv::TermCriteria::COUNT|cv::TermCriteria::EPS,30,0.01);
+    cv::Size winSize(10,10);
+  
+    cv::calcOpticalFlowPyrLK(prevGray, graySrc, pointsToTrack, newTracks, status, err, winSize, 0, termcrit, 0, 0.001);
 
     /*
     if (display_)
@@ -240,8 +328,9 @@ void FeatureTracker::process(const sensor_msgs::ImageConstPtr& msg)
 	  //This arc participated in the search in the first place
 	  if (status[pointIndex] == 1) //feature found!
 	    {
-	      float closeEps = 0.3f;
-	      float farEps = 10.0f;
+	      //ROS_INFO("Point %d was tracked", pointIndex);
+	      float closeEps = 1.0f;
+	      float farEps = 5.0f;
 	      if ((euclideanDist(thisArc->points.back(), newTracks[pointIndex]) > closeEps) &&
 		  (euclideanDist(thisArc->points.back(), newTracks[pointIndex]) < farEps))
 		{
@@ -252,8 +341,7 @@ void FeatureTracker::process(const sensor_msgs::ImageConstPtr& msg)
 	    }
 	  else
 	    {
-	      //Not found, mark as inactive
-	      thisArc->active=false;
+	      //Not found, mark as inactive	      thisArc->active=false;
 	    }
 
 	}
@@ -270,14 +358,17 @@ void FeatureTracker::process(const sensor_msgs::ImageConstPtr& msg)
     if (activePoints < FeatureTracker::MIN_TRACKS)
       {
 	vector<cv::Point2f> trackedPoints;
-	cv::goodFeaturesToTrack(graySrc, trackedPoints, FeatureTracker::MAX_TRACKS, 0.5, 15, cv::Mat(), 3, 0, 0.04);
-	cv::cornerSubPix(graySrc, trackedPoints, subPixWinSize, cv::Size(-1,-1), termcrit);
-		
+
+	getFeatures(graySrc, trackedPoints);
+	
 	int pointIndex = 0;
 	float closeEps = 1.0f;
 	for (int i=0; i<trackedPoints.size(); i++)
 	  {
 	    //Check to see if we're already tracking it
+	    //The distance here should be essentially zero, since the feature detector was run
+	    //on this image and the arc was already updated
+	    
 	    bool foundActive = false;
 	    for (shared_ptr<ArcInfo> thisArc : arcs)
 	      {
@@ -300,7 +391,7 @@ void FeatureTracker::process(const sensor_msgs::ImageConstPtr& msg)
 	  }
       }
 
-    ROS_INFO("Added %d new points to track", addedPoints);
+    //ROS_INFO("Added %d new points to track", addedPoints);
     //prepare the display
     dest_ptr->image = src_ptr->image.clone();
     cv::RNG rng(12345);
@@ -313,7 +404,7 @@ void FeatureTracker::process(const sensor_msgs::ImageConstPtr& msg)
     for (int i=0; i<  newTracks.size(); i++)
       {
 	//ROS_INFO("Drawing point %d",i++);
-	cv::circle(dest_ptr->image, newTracks[i], 4, featColor, -1, 8); 
+	cv::circle(dest_ptr->image, newTracks[i], 1, featColor, -1, 8); 
       }
  
     if(display_)
@@ -328,9 +419,9 @@ void FeatureTracker::process(const sensor_msgs::ImageConstPtr& msg)
       cv::waitKey(1);
     
     // Send the annotated image over ROS
-    src_ptr->encoding = sensor_msgs::image_encodings::BGR8;
+    dest_ptr->encoding = sensor_msgs::image_encodings::BGR8;
     
-    //image_pub_.publish(src_ptr->toImageMsg());
+    image_pub_.publish(dest_ptr->toImageMsg());
   } catch(cv_bridge::Exception & e) {
     ROS_ERROR("cv_bridge exception: %s", e.what());
   }

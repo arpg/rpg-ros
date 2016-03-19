@@ -8,6 +8,25 @@
 #include <opencv2/calib3d/calib3d.hpp>
 #include <cstdlib>
 
+/* File format:
+   arc index, ptx, pty
+*/
+
+void writeArcs(std::vector<feature_tracker::Arc> &arcs)
+{
+  FILE* fptr = fopen("arc_data.txt", "w");
+  int index = 0;
+  for (feature_tracker::Arc thisArc : arcs)
+    {
+      for (int i=0; i<thisArc.x.size(); i++)
+	{
+	  fprintf(fptr, "%d, %1.2f, %1.2f\n", index, thisArc.x[i], thisArc.y[i]);
+	}
+      index++;
+    }
+  fclose(fptr);
+}
+
 void drawArcs(std::vector<feature_tracker::Arc> &arcs, uint16_t width, uint16_t height)
 {
   cv::Mat outImage = cv::Mat(height, width, CV_8UC3);
@@ -29,6 +48,9 @@ void drawArcs(std::vector<feature_tracker::Arc> &arcs, uint16_t width, uint16_t 
   cv::imshow("Arcs", outImage);
   cv::waitKey(0);
   cv::imwrite("output.jpg", outImage);
+
+  //Write out the arc data
+  
 }
 
 int main(int argc, char **argv)
@@ -48,6 +70,7 @@ int main(int argc, char **argv)
   {
     ROS_INFO("Got %d arcs", srv.response.arcs.size());
     drawArcs(srv.response.arcs, srv.response.imageWidth, srv.response.imageHeight);
+    writeArcs(srv.response.arcs);
   }
   else
   {
