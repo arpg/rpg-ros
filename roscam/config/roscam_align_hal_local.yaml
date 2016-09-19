@@ -1,0 +1,1 @@
+roscam_node: {URI: "align:[cam=/home/smcguire/catkin_ws/src/roscam/config/two_cams.xml,idx=0]//ros:[topics=/camera/rgb/image_raw+/camera/depth/image,sizes=640x480+640x480]//", fps: 30, topics: "/asus_one/image_raw+/asus_two/image_raw", camera_model: "/home/smcguire/catkin_ws/src/roscam/config/two_cams.xml", frames: "/rgb_optical_frame+/rgb_optical_frame"}

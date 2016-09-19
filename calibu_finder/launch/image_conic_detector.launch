@@ -1,0 +1,50 @@
+<?xml version="1.0" ?>
+<launch>
+       <arg name="view_cameras" default="false"/>
+       <arg name="source_cam" default="/camera"/>
+
+     
+    <!-- Start nodelet manager in top-level namespace -->
+    <arg name="manager" value="calibu_cal_nodelet_manager" />
+    <arg name="debug" default="false" /> <!-- Run manager in GDB? -->
+    <!-- Worker threads for the nodelet manager -->
+    <arg name="num_worker_threads" default="4" />
+    <arg name="respawn" default="false" />
+    <arg     if="$(arg respawn)" name="bond" value="" />
+    <arg unless="$(arg respawn)" name="bond" value="--no-bond" />
+
+
+    <include file="$(find rgbd_launch)/launch/includes/manager.launch.xml">
+      <arg name="name"                value="$(arg manager)" />
+      <arg name="debug"               value="$(arg debug)" />
+      <arg name="num_worker_threads"  value="$(arg num_worker_threads)" />
+    </include>
+
+	 <node pkg="nodelet" type="nodelet" name="debayer_mono"
+              args="load image_proc/debayer $(arg manager) $(arg bond)"
+	      respawn="$(arg respawn)" output="screen">
+
+	      <remap from="/image_raw"        to="$(arg source_cam)/rgb/image_raw" />
+      	      <remap from="/camera_info"       to="$(arg source_cam)/rgb/camera_info" />
+	      <remap from="/image_mono"       to="$(arg source_cam)/rgb/image_mono" />
+      	</node>
+
+	<node pkg="calibu_finder" type="image_conic_detector" name="image_conic_detector" output="screen" >
+	  <param name="/image_topic" value="$(arg source_cam)/rgb/image_mono"/>
+	  <remap from="/features" to="$(arg source_cam)/rgb/features" />
+	</node>
+
+	<node pkg="calibu_finder" type="image_points" name="image_annotator" output="screen">
+	  <remap from="/image" to="$(arg source_cam)/rgb/image_raw"/>
+	  <remap from="/features" to="$(arg source_cam)/rgb/features" />
+	  <remap from="/annotated" to="$(arg source_cam)/rgb/annotated" />
+	  <param name="marker_size" value="3" />
+	</node>
+
+
+     
+     <node pkg="tf" type="static_transform_publisher" name="target_frame" args="0.1 0.0 1.0 0.0 1.5708 0.0 world camera_link 100" />
+<!--
+     <node name="rviz" pkg="rviz" type="rviz" args="-d $(find target_finder)/config/target_finder.rviz" required="true" />
+-->
+</launch>

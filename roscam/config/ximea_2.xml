@@ -1,0 +1,41 @@
+<!-- Values for an Asus Xtion Pro extracted from ROS defaults-->
+<rig>
+    <camera>
+        <camera_model name="rgb" index="0" serialno="0"
+type="calibu_fu_fv_u0_v0_k1_k2_k3" version="5124248">
+            <width> 640 </width>
+            <height> 480 </height>
+            <!-- Use RDF matrix, [right down forward], to define the
+coordinate frame convention -->
+            <right> [ 1; 0; 0 ] </right>
+            <down> [ 0; 1; 0 ] </down>
+            <forward> [ 0; 0; 1 ] </forward>
+            <!-- Camera parameters ordered as per type name. -->
+            <params> [525.0; 525.0, 319.5, 239.5, 0.0, 0.0, 0.0 ] </params>
+        </camera_model>
+        <pose>
+            <!-- Camera pose. World from Camera point transfer. 3x4
+matrix, in the RDF frame convention defined above -->
+            <T_wc> [ 1, 0, 0, 0; 0, 1, 0, 0; 0, 0, 1, 0 ] </T_wc>
+        </pose>
+    </camera>
+    <camera>
+        <camera_model name="rgb" index="0" serialno="0"
+type="calibu_fu_fv_u0_v0_k1_k2_k3" version="5124248">
+            <width> 640 </width>
+            <height> 480 </height>
+            <!-- Use RDF matrix, [right down forward], to define the
+coordinate frame convention -->
+            <right> [ 1; 0; 0 ] </right>
+            <down> [ 0; 1; 0 ] </down>
+            <forward> [ 0; 0; 1 ] </forward>
+            <!-- Camera parameters ordered as per type name. -->
+            <params> [525.0; 525.0, 319.5, 239.5, 0.0, 0.0, 0.0 ] </params>
+        </camera_model>
+        <pose>
+            <!-- Camera pose. World from Camera point transfer. 3x4
+matrix, in the RDF frame convention defined above -->
+            <T_wc> [ 1, 0, 0, 0; 0, 1, 0, 0; 0, 0, 1, 0 ] </T_wc>
+        </pose>
+    </camera>
+</rig>
